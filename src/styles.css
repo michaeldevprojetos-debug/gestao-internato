@@ -82,7 +82,10 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
+  * {
+    border-color: var(--color-border);
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -95,9 +98,11 @@
    itens de menu, botões ghost/outline e linhas de tabela.
 ----------------------------------------------------------------------------*/
 @layer utilities {
+
   /* Sidebar — itens inativos no hover */
   [data-sidebar="menu-button"]:not([data-active="true"]):hover {
-    background-color: oklch(0.9100 0 0) !important; /* ~slate-200 */
+    background-color: oklch(0.9100 0 0) !important;
+    /* ~slate-200 */
     color: var(--foreground) !important;
   }
 
@@ -105,7 +110,8 @@
   .hover\:bg-accent:hover,
   [data-slot="button"][class*="ghost"]:hover,
   [data-slot="button"][class*="outline"]:hover {
-    background-color: oklch(0.9000 0 0) !important; /* ~slate-200 mais escuro */
+    background-color: oklch(0.9000 0 0) !important;
+    /* ~slate-200 mais escuro */
   }
 
   /* Linhas de tabela */
@@ -118,5 +124,26 @@
   [data-slot="dropdown-menu-item"]:hover,
   [data-highlighted] {
     background-color: oklch(0.9000 0.0300 145) !important;
+  }
+
+  /* --- Dashboard Dark Theme Enhancements --- */
+  .card-glow {
+    @apply border border-white/10 bg-white/5 backdrop-blur-md;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-glow:hover {
+    box-shadow: 0 0 15px rgba(22, 163, 74, 0.15);
+    /* Afya green glow */
+    border-color: rgba(22, 163, 74, 0.3);
+  }
+
+  /* Sidebar Active Item Glow in Dark Theme */
+  .dark [data-sidebar="menu-button"][data-active="true"] {
+    background-color: rgba(22, 163, 74, 0.1) !important;
+    color: #4ade80 !important;
+    /* text-green-400 */
+    border-right: 2px solid #22c55e;
+    box-shadow: inset 0 0 10px rgba(22, 163, 74, 0.1);
   }
 }
