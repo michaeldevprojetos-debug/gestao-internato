@@ -16,29 +16,44 @@ export type Database = {
     Tables: {
       alunos: {
         Row: {
+          CODTURMA: string | null
           cpf: string | null
+          CPF: string | null
           created_at: string | null
           id: string
           matricula: string | null
+          MATRICULA: string | null
           nome: string
+          NOME: string | null
+          PERIODO: string | null
           semestre: number | null
           status: string | null
         }
         Insert: {
+          CODTURMA?: string | null
           cpf?: string | null
+          CPF?: string | null
           created_at?: string | null
           id?: string
           matricula?: string | null
+          MATRICULA?: string | null
           nome: string
+          NOME?: string | null
+          PERIODO?: string | null
           semestre?: number | null
           status?: string | null
         }
         Update: {
+          CODTURMA?: string | null
           cpf?: string | null
+          CPF?: string | null
           created_at?: string | null
           id?: string
           matricula?: string | null
+          MATRICULA?: string | null
           nome?: string
+          NOME?: string | null
+          PERIODO?: string | null
           semestre?: number | null
           status?: string | null
         }
@@ -259,6 +274,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      truncate_alunos: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "super_admin"
