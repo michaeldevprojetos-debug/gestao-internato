@@ -287,7 +287,12 @@ function AlunosPage() {
                   let inserted = 0;
                   for (let i = 0; i < rows.length; i += BATCH) {
                     const chunk = rows.slice(i, i + BATCH);
-                    const { error: err } = await supabase.from("alunos").upsert(chunk, { onConflict: 'matricula' });
+                    const { error: err } = await supabase
+                      .from("alunos")
+                      .upsert(chunk, {
+                        onConflict: 'matricula',       // coluna com constraint alunos_matricula_unique
+                        ignoreDuplicates: false,        // atualiza em vez de ignorar duplicatas
+                      });
                     if (err) throw err;
                     inserted += chunk.length;
                     toast.loading(`Importando ${inserted.toLocaleString("pt-BR")}/${rows.length.toLocaleString("pt-BR")}…`, { id: tid });
