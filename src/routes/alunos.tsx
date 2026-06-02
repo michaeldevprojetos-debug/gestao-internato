@@ -137,34 +137,37 @@ function AlunosPage() {
     }
   }
 
-  // ── Limpar toda a base de alunos (TRUNCATE via RPC, fallback p/ DELETE) ─────
+  // ── Limpar toda a base de alunos — DELETE único sem loop ────────────────────
   async function handleDeleteAll() {
     if (!confirm("⚠️ Tem certeza? Isso apagará TODOS os registros de alunos!\n\nEsta ação NÃO pode ser desfeita.")) return;
     const tid = toast.loading("Apagando todos os alunos…");
     try {
-      // Tenta TRUNCATE via função RPC no Supabase (mais rápido para muitos registros)
+      // Estratégia 1: TRUNCATE via RPC (mais rápido, ideal para >10k registros)
       const { error: rpcErr } = await supabase.rpc('truncate_alunos');
 
-      if (rpcErr) {
-        // Fallback: DELETE em lotes caso a RPC não exista
-        console.warn("RPC truncate_alunos não disponível, usando DELETE:", rpcErr.message);
-        let deleted = 0;
-        while (true) {
-          const { data: batch, error: selErr } = await supabase
+      if (!rpcErr) {
+        // RPC funcionou
+        toast.success("✅ Base de alunos limpa com sucesso!", { id: tid });
+      } else {
+        // Estratégia 2: DELETE único — apaga TUDO em uma chamada só, sem loop
+        console.warn("RPC indisponível, usando DELETE único:", rpcErr.message);
+        const { error: delErr } = await supabase
+          .from('alunos')
+          .delete()
+          .gte('created_at', '1900-01-01'); // Condição sempre-verdadeira = apaga todos
+
+        if (delErr) {
+          // Estratégia 3: fallback final com neq no id nulo
+          const { error: delErr2 } = await supabase
             .from('alunos')
-            .select('id')
-            .limit(500);
-          if (selErr) throw selErr;
-          if (!batch || batch.length === 0) break;
-          const ids = batch.map(r => r.id);
-          const { error: delErr } = await supabase.from('alunos').delete().in('id', ids);
-          if (delErr) throw delErr;
-          deleted += ids.length;
-          toast.loading(`Apagando… ${deleted.toLocaleString("pt-BR")} registros removidos`, { id: tid });
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000');
+          if (delErr2) throw delErr2;
         }
+
+        toast.success("✅ Base de alunos limpa com sucesso!", { id: tid });
       }
 
-      toast.success("✅ Base de alunos limpa com sucesso!", { id: tid });
       setPage(0);
       setQuery("");
       fetchAlunos(0, "");
