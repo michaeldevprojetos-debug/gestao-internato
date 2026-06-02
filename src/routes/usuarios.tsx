@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/usuarios")({
