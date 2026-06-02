@@ -14,6 +14,7 @@ import { Plus, Pencil, Trash2, Search, Upload, Download, AlertCircle } from "luc
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import * as XLSX from "xlsx";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
