@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -38,28 +38,76 @@ export const Route = createFileRoute("/usuarios")({
   component: UsuariosPage,
 });
 
+// ---------------------------------------------------------------------------
+// Tipo alinhado com a tabela `usuarios_painel` do Supabase
+// ---------------------------------------------------------------------------
 type UsuarioAdmin = {
   id: string;
   nome: string;
   email: string;
-  nivel: "Admin" | "Visualizador";
+  nivel_acesso: "Admin" | "Visualizador";
 };
 
-const INICIAIS: UsuarioAdmin[] = [
-  { id: "u1", nome: "Maicon (Super Admin)", email: "maiconinform@gmail.com", nivel: "Admin" },
-  { id: "u2", nome: "Coordenação do Internato", email: "coordenacao@instituicao.org", nivel: "Admin" },
-  { id: "u3", nome: "Secretaria Acadêmica", email: "secretaria@instituicao.org", nivel: "Visualizador" },
-];
-
+// ---------------------------------------------------------------------------
+// Página principal
+// ---------------------------------------------------------------------------
 function UsuariosPage() {
   const { user, ready } = useAuth();
   const navigate = useNavigate();
-  const [usuarios, setUsuarios] = useState<UsuarioAdmin[]>(INICIAIS);
+  const [usuarios, setUsuarios] = useState<UsuarioAdmin[]>([]);
   const [editing, setEditing] = useState<UsuarioAdmin | null>(null);
+  const [loadingList, setLoadingList] = useState(true);
 
   useEffect(() => {
     if (ready && user && user.role !== "super_admin") navigate({ to: "/dashboard" });
   }, [ready, user, navigate]);
+
+  // ── Carrega a lista real do Supabase ──────────────────────────────────────
+  const fetchUsuarios = useCallback(async () => {
+    setLoadingList(true);
+    try {
+      const { data, error } = await supabase
+        .from("usuarios_painel")
+        .select("id, nome, email, nivel_acesso")
+        .order("nome");
+
+      if (error) throw error;
+      setUsuarios((data ?? []) as UsuarioAdmin[]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao carregar usuários.";
+      console.error("[UsuariosPage] fetchUsuarios:", err);
+      toast.error(msg);
+    } finally {
+      setLoadingList(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsuarios();
+  }, [fetchUsuarios]);
+
+  // ── Excluir usuário ───────────────────────────────────────────────────────
+  async function handleDeleteUser(id: string) {
+    const confirmado = window.confirm("Deseja realmente remover este usuário?");
+    if (!confirmado) return;
+
+    try {
+      const { error } = await supabase
+        .from("usuarios_painel")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast.success("Usuário removido!");
+      // Recarrega a lista do banco após exclusão
+      await fetchUsuarios();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao remover usuário.";
+      console.error("[UsuariosPage] handleDeleteUser:", err);
+      toast.error(msg);
+    }
+  }
 
   if (!user || user.role !== "super_admin") {
     return (
@@ -67,11 +115,6 @@ function UsuariosPage() {
         <ShieldAlert className="h-4 w-4" /> Acesso restrito ao Super Admin.
       </div>
     );
-  }
-
-  /** Callback chamado após salvar com sucesso para atualizar a lista local */
-  function handleNovoUsuario(novoUsuario: UsuarioAdmin) {
-    setUsuarios((prev) => [...prev, novoUsuario]);
   }
 
   return (
@@ -89,7 +132,7 @@ function UsuariosPage() {
             </Button>
           }
           title="Novo Usuário"
-          onSaved={handleNovoUsuario}
+          onSaved={fetchUsuarios}
         />
       </div>
 
@@ -105,42 +148,67 @@ function UsuariosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {usuarios.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">{u.nome}</TableCell>
-                  <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={u.nivel === "Admin" ? "default" : "secondary"}>
-                      {u.nivel}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => setEditing(u)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+              {loadingList ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                    Carregando usuários...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : usuarios.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                    Nenhum usuário cadastrado.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                usuarios.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.nome}</TableCell>
+                    <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={u.nivel_acesso === "Admin" ? "default" : "secondary"}>
+                        {u.nivel_acesso}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        {/* Botão Editar — abre o dialog passando os dados do usuário */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditing(u)}
+                          title="Editar usuário"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        {/* Botão Excluir — chama handleDeleteUser */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteUser(u.id)}
+                          title="Remover usuário"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
+      {/* Dialog de edição — aberto via setEditing(u) */}
       {editing && (
         <UsuarioDialog
           title="Editar Usuário"
           data={editing}
           open
           onOpenChange={(o) => !o && setEditing(null)}
+          onSaved={fetchUsuarios}
         />
       )}
     </div>
@@ -150,7 +218,6 @@ function UsuariosPage() {
 // ---------------------------------------------------------------------------
 // Dialog de criação / edição de usuário
 // ---------------------------------------------------------------------------
-
 function UsuarioDialog({
   trigger,
   title,
@@ -164,58 +231,84 @@ function UsuarioDialog({
   data?: UsuarioAdmin;
   open?: boolean;
   onOpenChange?: (o: boolean) => void;
-  onSaved?: (usuario: UsuarioAdmin) => void;
+  /** Chamado após salvar com sucesso (sem argumento — pai faz o refetch) */
+  onSaved?: () => void;
 }) {
-  // Estado controlado para os campos do formulário
+  const isEdit = Boolean(data?.id);
+
+  // Estado controlado dos campos
   const [nome, setNome] = useState(data?.nome ?? "");
   const [email, setEmail] = useState(data?.email ?? "");
-  const [nivel, setNivel] = useState<"Admin" | "Visualizador">(data?.nivel ?? "Visualizador");
+  const [nivel, setNivel] = useState<"Admin" | "Visualizador">(
+    data?.nivel_acesso ?? "Visualizador"
+  );
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(open ?? false);
+
+  function closeDialog() {
+    setDialogOpen(false);
+    if (onOpenChange) onOpenChange(false);
+  }
+
+  function resetForm() {
+    setNome("");
+    setEmail("");
+    setNivel("Visualizador");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const payload = { nome, email, nivel };
+    const payload = { nome: nome.trim(), email: email.trim(), nivel_acesso: nivel };
 
-    // ✅ Log para verificar se os dados do formulário estão sendo capturados
+    // ✅ Log para verificar captura dos dados antes de enviar ao Supabase
     console.log("[UsuarioDialog] onSubmit — dados capturados:", payload);
 
-    if (!nome.trim() || !email.trim()) {
+    if (!payload.nome || !payload.email) {
       toast.error("Preencha todos os campos obrigatórios.");
       return;
     }
 
     setLoading(true);
 
-    const { data: inserted, error } = await supabase
-      .from("usuarios_painel")
-      .insert([{ nome: nome.trim(), email: email.trim(), nivel }])
-      .select()
-      .single();
+    try {
+      if (isEdit && data?.id) {
+        // ── UPDATE ────────────────────────────────────────────────────────
+        const { error } = await supabase
+          .from("usuarios_painel")
+          .update({ nome: payload.nome, email: payload.email, nivel_acesso: payload.nivel_acesso })
+          .eq("id", data.id);
 
-    setLoading(false);
+        if (error) throw error;
 
-    if (error) {
-      console.error("[UsuarioDialog] Erro ao salvar no Supabase:", error);
-      toast.error(error.message);
-      return;
+        console.log("[UsuarioDialog] Usuário atualizado:", data.id);
+        toast.success("Usuário atualizado com sucesso!");
+      } else {
+        // ── INSERT ────────────────────────────────────────────────────────
+        const { data: inserted, error } = await supabase
+          .from("usuarios_painel")
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log("[UsuarioDialog] Usuário criado:", inserted);
+        toast.success("Usuário salvo com sucesso!");
+      }
+
+      // Notifica o pai para recarregar a lista
+      if (onSaved) onSaved();
+
+      closeDialog();
+      resetForm();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro inesperado ao salvar.";
+      console.error("[UsuarioDialog] Erro ao salvar no Supabase:", err);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
     }
-
-    console.log("[UsuarioDialog] Usuário salvo com sucesso:", inserted);
-    toast.success("Usuário salvo com sucesso!");
-
-    // Notifica o componente pai para atualizar a lista
-    if (onSaved && inserted) {
-      onSaved(inserted as UsuarioAdmin);
-    }
-
-    // Fecha o dialog e limpa o formulário
-    setDialogOpen(false);
-    if (onOpenChange) onOpenChange(false);
-    setNome("");
-    setEmail("");
-    setNivel("Visualizador");
   }
 
   return (
