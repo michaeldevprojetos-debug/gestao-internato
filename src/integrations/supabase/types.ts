@@ -128,6 +128,30 @@ export type Database = {
         }
         Relationships: []
       }
+      usuarios_painel: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          nivel_acesso: string
+          nome: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          nivel_acesso: string
+          nome: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          nivel_acesso?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       vinculo_operacional: {
         Row: {
           aluno_id: string | null
