@@ -173,7 +173,73 @@ function AlunosPage() {
             <Button variant="outline" onClick={handleExport}>
               <Download className="mr-2 h-4 w-4" />Exportar CSV
             </Button>
-            <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={() => {}} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={async (ev) => {
+              const file = ev.target.files?.[0];
+              if (!file) return;
+              const text = await file.text();
+              // Detecta separador (; ou ,)
+              const sep = text.split("\n")[0].includes(";") ? ";" : ",";
+              const lines = text.split(/\r?\n/).filter(l => l.trim());
+              const header = lines.shift()!.split(sep).map(h => h.trim().toUpperCase());
+              const idxMat  = header.findIndex(h => h.includes("MATR"));
+              const idxNome = header.findIndex(h => h.includes("NOME"));
+              const idxPer  = header.findIndex(h => h.includes("PERIODO") || h.includes("SEMESTRE") || h.includes("PERÍODO"));
+              const idxCpf  = header.findIndex(h => h.includes("CPF"));
+              if (idxMat < 0 || idxNome < 0) {
+                toast.error("CSV inválido: colunas MATRICULA e NOME são obrigatórias.");
+                ev.target.value = "";
+                return;
+              }
+              const seen = new Set<string>();
+              const rows: Array<{ matricula: string; nome: string; semestre: number | null; cpf?: string | null; status: string }> = [];
+              for (const ln of lines) {
+                const cols = ln.split(sep);
+                const mat = (cols[idxMat] ?? "").trim();
+                const nome = (cols[idxNome] ?? "").trim();
+                if (!mat || !nome || seen.has(mat)) continue;
+                seen.add(mat);
+                const per = idxPer >= 0 ? parseInt(cols[idxPer]) : NaN;
+                const cpf = idxCpf >= 0 ? (cols[idxCpf] ?? "").trim() : "";
+                rows.push({
+                  matricula: mat,
+                  nome,
+                  semestre: Number.isFinite(per) ? per : null,
+                  ...(canSeeCPF && cpf ? { cpf } : {}),
+                  status: "Ativo",
+                });
+              }
+              if (rows.length === 0) {
+                toast.warning("Nenhuma linha válida encontrada no CSV.");
+                ev.target.value = "";
+                return;
+              }
+              const tid = toast.loading(`Importando ${rows.length.toLocaleString("pt-BR")} alunos…`);
+              try {
+                const BATCH = 200;
+                let inserted = 0;
+                for (let i = 0; i < rows.length; i += BATCH) {
+                  const chunk = rows.slice(i, i + BATCH);
+                  const { error: err } = await supabase.from("alunos").insert(chunk);
+                  if (err) throw err;
+                  inserted += chunk.length;
+                  toast.loading(`Importando ${inserted.toLocaleString("pt-BR")}/${rows.length.toLocaleString("pt-BR")}…`, { id: tid });
+                }
+                toast.success(`✅ ${inserted.toLocaleString("pt-BR")} alunos importados!`, { id: tid });
+                fetchAlunos(0, "");
+                setPage(0);
+                setQuery("");
+              } catch (e: any) {
+                toast.error("Erro ao importar: " + (e?.message ?? "Tente novamente."), { id: tid });
+              } finally {
+                ev.target.value = "";
+              }
+            }}
+          />
           </div>
 
           {/* Tabela */}
