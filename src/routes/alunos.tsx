@@ -129,13 +129,15 @@ function AlunosPage() {
   // ── Deletar ──────────────────────────────────────────────────────────────────
   async function handleDelete(id: string, nome: string) {
     if (!confirm(`Excluir o aluno "${nome}"? Esta ação não pode ser desfeita.`)) return;
-    const { error: err } = await supabase.from("alunos").delete().eq("id", id);
-    if (err) {
-      toast.error("Erro ao excluir aluno: " + err.message);
-    } else {
-      toast.success("Aluno excluído.");
-      fetchAlunos(page, query);
+    const { error } = await supabase.from("alunos").delete().eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
     }
+
+    toast.success("Aluno excluído.");
+    setAlunos((prev) => prev.filter((aluno) => aluno.id !== id));
+    fetchAlunos(page, query);
   }
 
   // ── Limpar toda a base de alunos — deleção em cascata (sem FK violation) ─────

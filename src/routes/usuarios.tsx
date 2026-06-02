@@ -100,7 +100,9 @@ function UsuariosPage() {
       if (error) throw error;
 
       toast.success("Usuário removido!");
-      // Recarrega a lista do banco após exclusão
+      // Remove da lista local imediatamente para não precisar recarregar a tela
+      setUsuarios((prev) => prev.filter((u) => u.id !== id));
+      // Recarrega a lista do banco após exclusão para garantir sincronia
       await fetchUsuarios();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao remover usuário.";
@@ -285,6 +287,17 @@ function UsuarioDialog({
         toast.success("Usuário atualizado com sucesso!");
       } else {
         // ── INSERT ────────────────────────────────────────────────────────
+
+        // 1. Criar conta no Supabase Auth com senha provisória
+        const authData = await supabase.auth.signUp({
+          email: payload.email,
+          password: 'Afya@2026',
+          options: { data: { trocar_senha: true, nome: payload.nome } }
+        });
+
+        if (authData.error) throw authData.error;
+
+        // 2. Inserir registro na tabela usuarios_painel
         const { data: inserted, error } = await supabase
           .from("usuarios_painel")
           .insert([payload])
@@ -294,7 +307,7 @@ function UsuarioDialog({
         if (error) throw error;
 
         console.log("[UsuarioDialog] Usuário criado:", inserted);
-        toast.success("Usuário salvo com sucesso!");
+        toast.success("Usuário criado com a senha provisória: Afya@2026");
       }
 
       // Notifica o pai para recarregar a lista
