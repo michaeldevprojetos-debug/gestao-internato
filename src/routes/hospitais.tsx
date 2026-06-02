@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Pencil, Trash2, Building2, AlertCircle, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { UNIDADES } from "@/lib/mock-data";
 
 // ─── Tipo ─────────────────────────────────────────────────────────────────────
 // Hospitais/Locais são derivados da coluna `unidade_vinculada` da tabela
@@ -57,6 +58,11 @@ function HospitaisPage() {
 
       // Agrupa por unidade
       const map = new Map<string, { count: number; especialidades: Set<string> }>();
+      // Garante que TODAS as unidades pré-cadastradas apareçam no grid,
+      // mesmo quando ainda não houver preceptor vinculado.
+      for (const u of UNIDADES) {
+        map.set(u, { count: 0, especialidades: new Set() });
+      }
       for (const row of data ?? []) {
         const u = row.unidade_vinculada!;
         if (!map.has(u)) map.set(u, { count: 0, especialidades: new Set() });
@@ -71,7 +77,10 @@ function HospitaisPage() {
           totalPreceptores: v.count,
           especialidades: Array.from(v.especialidades).sort(),
         }))
-        .sort((a, b) => b.totalPreceptores - a.totalPreceptores);
+        .sort((a, b) =>
+          b.totalPreceptores - a.totalPreceptores ||
+          a.unidade.localeCompare(b.unidade, "pt-BR")
+        );
 
       setUnidades(rows);
       setFiltered(rows);
