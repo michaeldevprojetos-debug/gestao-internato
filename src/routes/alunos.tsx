@@ -46,13 +46,13 @@ function AlunosPage() {
   const { user } = useAuth();
   const canSeeCPF = user?.role === "super_admin";
 
-  const [alunos, setAlunos]     = useState<Aluno[]>([]);
-  const [total, setTotal]       = useState(0);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-  const [query, setQuery]       = useState("");
-  const [page, setPage]         = useState(0);
-  const [editing, setEditing]   = useState<Aluno | null>(null);
+  const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [editing, setEditing] = useState<Aluno | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const PAGE_SIZE = 25;
@@ -66,8 +66,9 @@ function AlunosPage() {
       const to = (pageNum + 1) * PAGE_SIZE - 1;
 
       let q = supabase
-        .from('alunos') // Forçamos a leitura da tabela correta
-        .select('matricula, nome, cpf, semestre, status', { count: 'exact' })
+        .from('alunos')
+        .select('id, matricula, nome, cpf, semestre, status', { count: 'exact' })
+        .not('nome', 'is', null)  // Ignora linhas sem nome preenchido
         .order('nome', { ascending: true })
         .range(from, to);
 
@@ -106,7 +107,7 @@ function AlunosPage() {
 
   useEffect(() => {
     fetchAlunos(page, query);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -136,16 +137,33 @@ function AlunosPage() {
     }
   }
 
-  // ── Limpar toda a base de alunos ────────────────────────────────────────────
-  async function handleClearAll() {
-    if (!confirm("Tem certeza? Isso apagará TODOS os registros de alunos! Esta ação não pode ser desfeita.")) return;
+  // ── Limpar toda a base de alunos (TRUNCATE via RPC, fallback p/ DELETE) ─────
+  async function handleDeleteAll() {
+    if (!confirm("⚠️ Tem certeza? Isso apagará TODOS os registros de alunos!\n\nEsta ação NÃO pode ser desfeita.")) return;
     const tid = toast.loading("Apagando todos os alunos…");
     try {
-      const { error: err } = await supabase
-        .from('alunos')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (err) throw err;
+      // Tenta TRUNCATE via função RPC no Supabase (mais rápido para muitos registros)
+      const { error: rpcErr } = await supabase.rpc('truncate_alunos');
+
+      if (rpcErr) {
+        // Fallback: DELETE em lotes caso a RPC não exista
+        console.warn("RPC truncate_alunos não disponível, usando DELETE:", rpcErr.message);
+        let deleted = 0;
+        while (true) {
+          const { data: batch, error: selErr } = await supabase
+            .from('alunos')
+            .select('id')
+            .limit(500);
+          if (selErr) throw selErr;
+          if (!batch || batch.length === 0) break;
+          const ids = batch.map(r => r.id);
+          const { error: delErr } = await supabase.from('alunos').delete().in('id', ids);
+          if (delErr) throw delErr;
+          deleted += ids.length;
+          toast.loading(`Apagando… ${deleted.toLocaleString("pt-BR")} registros removidos`, { id: tid });
+        }
+      }
+
       toast.success("✅ Base de alunos limpa com sucesso!", { id: tid });
       setPage(0);
       setQuery("");
@@ -170,17 +188,9 @@ function AlunosPage() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="destructive"
-            onClick={handleClearAll}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />Limpar Base de Alunos
-          </Button>
-          <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
-            <Plus className="mr-2 h-4 w-4" />Adicionar Novo
-          </Button>
-        </div>
+        <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
+          <Plus className="mr-2 h-4 w-4" />Adicionar Novo
+        </Button>
       </div>
 
       {error && (
@@ -211,73 +221,76 @@ function AlunosPage() {
             <Button variant="outline" onClick={handleExport}>
               <Download className="mr-2 h-4 w-4" />Exportar CSV
             </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={async (ev) => {
-              const file = ev.target.files?.[0];
-              if (!file) return;
-              const text = await file.text();
-              // Detecta separador (; ou ,)
-              const sep = text.split("\n")[0].includes(";") ? ";" : ",";
-              const lines = text.split(/\r?\n/).filter(l => l.trim());
-              const header = lines.shift()!.split(sep).map(h => h.trim().toUpperCase());
-              const idxMat  = header.findIndex(h => h.includes("MATR"));
-              const idxNome = header.findIndex(h => h.includes("NOME"));
-              const idxPer  = header.findIndex(h => h.includes("PERIODO") || h.includes("SEMESTRE") || h.includes("PERÍODO"));
-              const idxCpf  = header.findIndex(h => h.includes("CPF"));
-              if (idxMat < 0 || idxNome < 0) {
-                toast.error("CSV inválido: colunas MATRICULA e NOME são obrigatórias.");
-                ev.target.value = "";
-                return;
-              }
-              const seen = new Set<string>();
-              const rows: Array<{ matricula: string; nome: string; semestre: number | null; cpf?: string | null; status: string }> = [];
-              for (const ln of lines) {
-                const cols = ln.split(sep);
-                const mat = (cols[idxMat] ?? "").trim();
-                const nome = (cols[idxNome] ?? "").trim();
-                if (!mat || !nome || seen.has(mat)) continue;
-                seen.add(mat);
-                const per = idxPer >= 0 ? parseInt(cols[idxPer]) : NaN;
-                const cpf = idxCpf >= 0 ? (cols[idxCpf] ?? "").trim() : "";
-                rows.push({
-                  matricula: mat,
-                  nome,
-                  semestre: Number.isFinite(per) ? per : null,
-                  ...(canSeeCPF && cpf ? { cpf } : {}),
-                  status: "Ativo",
-                });
-              }
-              if (rows.length === 0) {
-                toast.warning("Nenhuma linha válida encontrada no CSV.");
-                ev.target.value = "";
-                return;
-              }
-              const tid = toast.loading(`Importando ${rows.length.toLocaleString("pt-BR")} alunos…`);
-              try {
-                const BATCH = 200;
-                let inserted = 0;
-                for (let i = 0; i < rows.length; i += BATCH) {
-                  const chunk = rows.slice(i, i + BATCH);
-                  const { error: err } = await supabase.from("alunos").insert(chunk);
-                  if (err) throw err;
-                  inserted += chunk.length;
-                  toast.loading(`Importando ${inserted.toLocaleString("pt-BR")}/${rows.length.toLocaleString("pt-BR")}…`, { id: tid });
+            <Button variant="destructive" onClick={handleDeleteAll}>
+              <Trash2 className="mr-2 h-4 w-4" />Limpar Base
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={async (ev) => {
+                const file = ev.target.files?.[0];
+                if (!file) return;
+                const text = await file.text();
+                // Detecta separador (; ou ,)
+                const sep = text.split("\n")[0].includes(";") ? ";" : ",";
+                const lines = text.split(/\r?\n/).filter(l => l.trim());
+                const header = lines.shift()!.split(sep).map(h => h.trim().toUpperCase());
+                const idxMat = header.findIndex(h => h.includes("MATR"));
+                const idxNome = header.findIndex(h => h.includes("NOME"));
+                const idxPer = header.findIndex(h => h.includes("PERIODO") || h.includes("SEMESTRE") || h.includes("PERÍODO"));
+                const idxCpf = header.findIndex(h => h.includes("CPF"));
+                if (idxMat < 0 || idxNome < 0) {
+                  toast.error("CSV inválido: colunas MATRICULA e NOME são obrigatórias.");
+                  ev.target.value = "";
+                  return;
                 }
-                toast.success(`✅ ${inserted.toLocaleString("pt-BR")} alunos importados!`, { id: tid });
-                fetchAlunos(0, "");
-                setPage(0);
-                setQuery("");
-              } catch (e: any) {
-                toast.error("Erro ao importar: " + (e?.message ?? "Tente novamente."), { id: tid });
-              } finally {
-                ev.target.value = "";
-              }
-            }}
-          />
+                const seen = new Set<string>();
+                const rows: Array<{ matricula: string; nome: string; semestre: number | null; cpf?: string | null; status: string }> = [];
+                for (const ln of lines) {
+                  const cols = ln.split(sep);
+                  const mat = (cols[idxMat] ?? "").trim();
+                  const nome = (cols[idxNome] ?? "").trim();
+                  if (!mat || !nome || seen.has(mat)) continue;
+                  seen.add(mat);
+                  const per = idxPer >= 0 ? parseInt(cols[idxPer]) : NaN;
+                  const cpf = idxCpf >= 0 ? (cols[idxCpf] ?? "").trim() : "";
+                  rows.push({
+                    matricula: mat,
+                    nome,
+                    semestre: Number.isFinite(per) ? per : null,
+                    ...(canSeeCPF && cpf ? { cpf } : {}),
+                    status: "Ativo",
+                  });
+                }
+                if (rows.length === 0) {
+                  toast.warning("Nenhuma linha válida encontrada no CSV.");
+                  ev.target.value = "";
+                  return;
+                }
+                const tid = toast.loading(`Importando ${rows.length.toLocaleString("pt-BR")} alunos…`);
+                try {
+                  const BATCH = 200;
+                  let inserted = 0;
+                  for (let i = 0; i < rows.length; i += BATCH) {
+                    const chunk = rows.slice(i, i + BATCH);
+                    const { error: err } = await supabase.from("alunos").upsert(chunk, { onConflict: 'matricula' });
+                    if (err) throw err;
+                    inserted += chunk.length;
+                    toast.loading(`Importando ${inserted.toLocaleString("pt-BR")}/${rows.length.toLocaleString("pt-BR")}…`, { id: tid });
+                  }
+                  toast.success(`✅ ${inserted.toLocaleString("pt-BR")} alunos importados!`, { id: tid });
+                  fetchAlunos(0, "");
+                  setPage(0);
+                  setQuery("");
+                } catch (e: any) {
+                  toast.error("Erro ao importar: " + (e?.message ?? "Tente novamente."), { id: tid });
+                } finally {
+                  ev.target.value = "";
+                }
+              }}
+            />
           </div>
 
           {/* Tabela */}
@@ -296,12 +309,12 @@ function AlunosPage() {
               <TableBody>
                 {loading
                   ? Array.from({ length: PAGE_SIZE }).map((_, i) => (
-                      <TableRow key={i}>
-                        {Array.from({ length: 6 }).map((__, j) => (
-                          <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                        ))}
-                      </TableRow>
-                    ))
+                    <TableRow key={i}>
+                      {Array.from({ length: 6 }).map((__, j) => (
+                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                      ))}
+                    </TableRow>
+                  ))
                   : alunos.length === 0
                     ? (
                       <TableRow>
@@ -389,12 +402,12 @@ function AlunoDialog({
   onSaved: () => void;
 }) {
   const isEdit = !!data;
-  const [saving, setSaving]     = useState(false);
-  const [nome, setNome]         = useState("");
+  const [saving, setSaving] = useState(false);
+  const [nome, setNome] = useState("");
   const [matricula, setMatricula] = useState("");
-  const [cpf, setCpf]           = useState("");
+  const [cpf, setCpf] = useState("");
   const [semestre, setSemestre] = useState("");
-  const [status, setStatus]     = useState("Ativo");
+  const [status, setStatus] = useState("Ativo");
 
   useEffect(() => {
     if (open) {
