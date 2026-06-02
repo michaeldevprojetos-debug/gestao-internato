@@ -89,3 +89,34 @@
     font-family: var(--font-sans);
   }
 }
+
+/* ─── Hover contrast (UI/UX) ───────────────────────────────────────────────
+   O accent default é muito claro; garantimos contraste suficiente em
+   itens de menu, botões ghost/outline e linhas de tabela.
+----------------------------------------------------------------------------*/
+@layer utilities {
+  /* Sidebar — itens inativos no hover */
+  [data-sidebar="menu-button"]:not([data-active="true"]):hover {
+    background-color: oklch(0.9100 0 0) !important; /* ~slate-200 */
+    color: var(--foreground) !important;
+  }
+
+  /* Botões ghost (ações de tabela: editar / excluir) */
+  .hover\:bg-accent:hover,
+  [data-slot="button"][class*="ghost"]:hover,
+  [data-slot="button"][class*="outline"]:hover {
+    background-color: oklch(0.9000 0 0) !important; /* ~slate-200 mais escuro */
+  }
+
+  /* Linhas de tabela */
+  tbody tr:hover {
+    background-color: oklch(0.9400 0.0050 80) !important;
+  }
+
+  /* Dropdown / Select itens em foco/hover */
+  [data-slot="select-item"]:hover,
+  [data-slot="dropdown-menu-item"]:hover,
+  [data-highlighted] {
+    background-color: oklch(0.9000 0.0300 145) !important;
+  }
+}

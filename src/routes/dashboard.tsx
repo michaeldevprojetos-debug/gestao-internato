@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -9,6 +10,7 @@ import {
   UNIDADES, totalAlunosAtivos, totalPreceptores, totalHorasMensais,
 } from "@/lib/mock-data";
 import { Users, Stethoscope, Clock, Building2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Preceptoria" }] }),
@@ -62,6 +64,16 @@ function Stat({ icon: Icon, value, label, hint }: { icon: any; value: string; la
 }
 
 function Dashboard() {
+  const [totalAlunosDB, setTotalAlunosDB] = useState<number | null>(null);
+  useEffect(() => {
+    supabase
+      .from("alunos")
+      .select("id", { count: "exact", head: true })
+      .then(({ count }) => setTotalAlunosDB(count ?? 0));
+  }, []);
+  const alunosLabel = totalAlunosDB === null
+    ? String(totalAlunosAtivos)
+    : totalAlunosDB.toLocaleString("pt-BR");
   return (
     <div className="space-y-6">
       <div>
@@ -71,7 +83,7 @@ function Dashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon={Stethoscope} value={String(totalPreceptores)} label="Preceptores" hint="ativos" />
-        <Stat icon={Users}       value={String(totalAlunosAtivos)} label="Alunos" hint="ativos" />
+        <Stat icon={Users}       value={alunosLabel} label="Alunos" hint="cadastrados" />
         <Stat icon={Building2}   value={String(totalUnidades)} label="Hospitais / Locais" hint="cadastrados" />
         <Stat icon={Clock}       value={`${totalHorasMensais}`} label="Horas Lançadas" hint="este mês" />
       </div>
