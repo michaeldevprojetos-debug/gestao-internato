@@ -229,7 +229,7 @@ function AlunosPage() {
               />
             </div>
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" />Importar CSV
+              <Upload className="mr-2 h-4 w-4" />Importar planilha
             </Button>
             <Button variant="outline" onClick={handleExport}>
               <Download className="mr-2 h-4 w-4" />Exportar CSV
@@ -240,35 +240,61 @@ function AlunosPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               className="hidden"
               onChange={async (ev) => {
                 const file = ev.target.files?.[0];
                 if (!file) return;
-                const text = await file.text();
-                // Detecta separador (; ou ,)
-                const sep = text.split("\n")[0].includes(";") ? ";" : ",";
-                const lines = text.split(/\r?\n/).filter(l => l.trim());
-                const header = lines.shift()!.split(sep).map(h => h.trim().toUpperCase());
+                // Parse CSV ou XLSX como matriz de strings
+                let matrix: string[][] = [];
+                try {
+                  const name = file.name.toLowerCase();
+                  if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+                    const buf = await file.arrayBuffer();
+                    const wb = XLSX.read(buf, { type: "array" });
+                    const ws = wb.Sheets[wb.SheetNames[0]];
+                    matrix = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, raw: false, defval: "" }) as string[][];
+                  } else {
+                    const text = await file.text();
+                    const sep = text.split("\n")[0].includes(";") ? ";" : ",";
+                    matrix = text.split(/\r?\n/).filter(l => l.trim()).map(l => l.split(sep));
+                  }
+                } catch (err: any) {
+                  toast.error("Não foi possível ler o arquivo: " + (err?.message ?? "formato inválido."));
+                  ev.target.value = "";
+                  return;
+                }
+                if (matrix.length < 2) {
+                  toast.error("Planilha vazia.");
+                  ev.target.value = "";
+                  return;
+                }
+                const header = matrix[0].map(h => String(h ?? "").trim().toUpperCase());
                 const idxMat = header.findIndex(h => h.includes("MATR"));
                 const idxNome = header.findIndex(h => h.includes("NOME"));
                 const idxPer = header.findIndex(h => h.includes("PERIODO") || h.includes("SEMESTRE") || h.includes("PERÍODO"));
                 const idxCpf = header.findIndex(h => h.includes("CPF"));
                 if (idxMat < 0 || idxNome < 0) {
-                  toast.error("CSV inválido: colunas MATRICULA e NOME são obrigatórias.");
+                  toast.error("Planilha inválida: colunas MATRICULA e NOME são obrigatórias.");
                   ev.target.value = "";
                   return;
                 }
-                const seen = new Set<string>();
+                const seenMat = new Set<string>();
+                const seenNome = new Set<string>();
                 const rows: Array<{ matricula: string; nome: string; semestre: number | null; cpf?: string | null; status: string }> = [];
-                for (const ln of lines) {
-                  const cols = ln.split(sep);
-                  const mat = (cols[idxMat] ?? "").trim();
-                  const nome = (cols[idxNome] ?? "").trim();
-                  if (!mat || !nome || seen.has(mat)) continue;
-                  seen.add(mat);
-                  const per = idxPer >= 0 ? parseInt(cols[idxPer]) : NaN;
-                  const cpf = idxCpf >= 0 ? (cols[idxCpf] ?? "").trim() : "";
+                let dupMat = 0, dupNome = 0;
+                for (let i = 1; i < matrix.length; i++) {
+                  const cols = matrix[i];
+                  const mat = String(cols[idxMat] ?? "").trim();
+                  const nome = String(cols[idxNome] ?? "").trim().replace(/\s+/g, " ");
+                  if (!mat || !nome) continue;
+                  if (seenMat.has(mat)) { dupMat++; continue; }
+                  const nomeKey = nome.toUpperCase();
+                  if (seenNome.has(nomeKey)) { dupNome++; continue; }
+                  seenMat.add(mat); seenNome.add(nomeKey);
+                  const perRaw = idxPer >= 0 ? String(cols[idxPer] ?? "").trim() : "";
+                  const per = perRaw ? parseInt(perRaw, 10) : NaN;
+                  const cpf = idxCpf >= 0 ? String(cols[idxCpf] ?? "").trim() : "";
                   rows.push({
                     matricula: mat,
                     nome,
@@ -278,7 +304,7 @@ function AlunosPage() {
                   });
                 }
                 if (rows.length === 0) {
-                  toast.warning("Nenhuma linha válida encontrada no CSV.");
+                  toast.warning("Nenhuma linha válida encontrada.");
                   ev.target.value = "";
                   return;
                 }
@@ -298,7 +324,11 @@ function AlunosPage() {
                     inserted += chunk.length;
                     toast.loading(`Importando ${inserted.toLocaleString("pt-BR")}/${rows.length.toLocaleString("pt-BR")}…`, { id: tid });
                   }
-                  toast.success(`✅ ${inserted.toLocaleString("pt-BR")} alunos importados!`, { id: tid });
+                  const skipped = dupMat + dupNome;
+                  toast.success(
+                    `✅ ${inserted.toLocaleString("pt-BR")} alunos importados${skipped ? ` · ${skipped} duplicados ignorados (matrícula: ${dupMat}, nome: ${dupNome})` : ""}.`,
+                    { id: tid }
+                  );
                   fetchAlunos(0, "");
                   setPage(0);
                   setQuery("");
