@@ -62,28 +62,31 @@ function AlunosPage() {
     setLoading(true);
     setError(null);
     try {
+      const from = pageNum * PAGE_SIZE;
+      const to = (pageNum + 1) * PAGE_SIZE - 1;
+
       let q = supabase
-        .from("alunos")
-        .select("*", { count: "exact" })
-        .order("nome", { ascending: true })
-        .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
+        .from('alunos') // Forçamos a leitura da tabela correta
+        .select('matricula, nome, cpf, semestre, status', { count: 'exact' })
+        .order('nome', { ascending: true })
+        .range(from, to);
 
       // Filtro de busca: nome ou matrícula
       if (search.trim()) {
         q = q.or(`nome.ilike.%${search.trim()}%,matricula.ilike.%${search.trim()}%`);
       }
 
-      const { data, error: err, count } = await q;
+      const { data, error, count } = await q;
 
-      // ── Debug: verificar no console do navegador ──
-      console.log("[alunos] data:", data);
-      console.log("[alunos] error:", err);
-      console.log("[alunos] count:", count);
-
-      if (err) throw err;
-
-      setAlunos(data ?? []);
-      setTotal(count ?? 0);
+      if (error) {
+        console.error("Erro na busca de alunos:", error);
+        throw error;
+      } else {
+        console.log("Dados encontrados:", data);
+        console.log("Total de registros:", count);
+        setAlunos(data ?? []);
+        setTotal(count ?? 0);
+      }
     } catch (e: any) {
       console.error("[alunos] catch:", e);
       setError(e?.message ?? "Erro ao carregar alunos.");
@@ -133,6 +136,26 @@ function AlunosPage() {
     }
   }
 
+  // ── Limpar toda a base de alunos ────────────────────────────────────────────
+  async function handleClearAll() {
+    if (!confirm("Tem certeza? Isso apagará TODOS os registros de alunos! Esta ação não pode ser desfeita.")) return;
+    const tid = toast.loading("Apagando todos os alunos…");
+    try {
+      const { error: err } = await supabase
+        .from('alunos')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (err) throw err;
+      toast.success("✅ Base de alunos limpa com sucesso!", { id: tid });
+      setPage(0);
+      setQuery("");
+      fetchAlunos(0, "");
+    } catch (e: any) {
+      console.error("[alunos] erro ao limpar base:", e);
+      toast.error("Erro ao limpar base: " + (e?.message ?? "Tente novamente."), { id: tid });
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -147,9 +170,17 @@ function AlunosPage() {
             )}
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />Adicionar Novo
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="destructive"
+            onClick={handleClearAll}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />Limpar Base de Alunos
+          </Button>
+          <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" />Adicionar Novo
+          </Button>
+        </div>
       </div>
 
       {error && (
