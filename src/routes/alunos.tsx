@@ -64,7 +64,7 @@ function AlunosPage() {
     try {
       let q = supabase
         .from("alunos")
-        .select("id, matricula, nome, cpf, semestre, status", { count: "exact" })
+        .select("*", { count: "exact" })
         .order("nome", { ascending: true })
         .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
@@ -74,11 +74,18 @@ function AlunosPage() {
       }
 
       const { data, error: err, count } = await q;
+
+      // ── Debug: verificar no console do navegador ──
+      console.log("[alunos] data:", data);
+      console.log("[alunos] error:", err);
+      console.log("[alunos] count:", count);
+
       if (err) throw err;
 
       setAlunos(data ?? []);
       setTotal(count ?? 0);
     } catch (e: any) {
+      console.error("[alunos] catch:", e);
       setError(e?.message ?? "Erro ao carregar alunos.");
     } finally {
       setLoading(false);
