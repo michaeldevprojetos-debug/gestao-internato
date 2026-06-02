@@ -137,37 +137,46 @@ function AlunosPage() {
     }
   }
 
-  // ── Limpar toda a base de alunos — DELETE único sem loop ────────────────────
+  // ── Limpar toda a base de alunos — deleção em cascata (sem FK violation) ─────
   async function handleDeleteAll() {
-    if (!confirm("⚠️ Tem certeza? Isso apagará TODOS os registros de alunos!\n\nEsta ação NÃO pode ser desfeita.")) return;
-    const tid = toast.loading("Apagando todos os alunos…");
+    if (!confirm("⚠️ Tem certeza? Isso apagará TODOS os alunos e seus vínculos!\n\nEsta ação NÃO pode ser desfeita.")) return;
+    const tid = toast.loading("Removendo vínculos e alunos…");
     try {
-      // Estratégia 1: TRUNCATE via RPC (mais rápido, ideal para >10k registros)
-      const { error: rpcErr } = await supabase.rpc('truncate_alunos');
+      // Passo 1 — Remove vínculos operacionais que referenciam alunos (FK)
+      toast.loading("Passo 1/2 — Removendo vínculos operacionais…", { id: tid });
+      const { error: errVinculos } = await supabase
+        .from('vinculo_operacional')
+        .delete()
+        .gte('created_at', '1900-01-01');
 
-      if (!rpcErr) {
-        // RPC funcionou
-        toast.success("✅ Base de alunos limpa com sucesso!", { id: tid });
-      } else {
-        // Estratégia 2: DELETE único — apaga TUDO em uma chamada só, sem loop
-        console.warn("RPC indisponível, usando DELETE único:", rpcErr.message);
-        const { error: delErr } = await supabase
-          .from('alunos')
+      if (errVinculos) {
+        // Tenta com neq como fallback para vinculo_operacional
+        const { error: errVinculos2 } = await supabase
+          .from('vinculo_operacional')
           .delete()
-          .gte('created_at', '1900-01-01'); // Condição sempre-verdadeira = apaga todos
-
-        if (delErr) {
-          // Estratégia 3: fallback final com neq no id nulo
-          const { error: delErr2 } = await supabase
-            .from('alunos')
-            .delete()
-            .neq('id', '00000000-0000-0000-0000-000000000000');
-          if (delErr2) throw delErr2;
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        if (errVinculos2) {
+          console.warn("Não foi possível limpar vínculos (podem não existir):", errVinculos2.message);
         }
-
-        toast.success("✅ Base de alunos limpa com sucesso!", { id: tid });
       }
 
+      // Passo 2 — Agora apaga os alunos (sem conflito de FK)
+      toast.loading("Passo 2/2 — Removendo alunos…", { id: tid });
+      const { error: errAlunos } = await supabase
+        .from('alunos')
+        .delete()
+        .gte('created_at', '1900-01-01');
+
+      if (errAlunos) {
+        // Fallback: neq no UUID nulo
+        const { error: errAlunos2 } = await supabase
+          .from('alunos')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        if (errAlunos2) throw errAlunos2;
+      }
+
+      toast.success("✅ Base de alunos limpa com sucesso!", { id: tid });
       setPage(0);
       setQuery("");
       fetchAlunos(0, "");
