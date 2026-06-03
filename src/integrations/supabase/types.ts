@@ -59,6 +59,27 @@ export type Database = {
         }
         Relationships: []
       }
+      locais: {
+        Row: {
+          created_at: string | null
+          id: string
+          nome: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          nome: string
+          tipo?: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          nome?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
       preceptores: {
         Row: {
           campo_pratica: string | null
@@ -66,6 +87,7 @@ export type Database = {
           created_at: string | null
           especialidade: string | null
           id: string
+          local_id: string | null
           nome: string
           tipo_contrato: string | null
           unidade_vinculada: string | null
@@ -77,6 +99,7 @@ export type Database = {
           created_at?: string | null
           especialidade?: string | null
           id?: string
+          local_id?: string | null
           nome: string
           tipo_contrato?: string | null
           unidade_vinculada?: string | null
@@ -88,12 +111,21 @@ export type Database = {
           created_at?: string | null
           especialidade?: string | null
           id?: string
+          local_id?: string | null
           nome?: string
           tipo_contrato?: string | null
           unidade_vinculada?: string | null
           valor_hora?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "preceptores_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: false
+            referencedRelation: "locais"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rotacoes: {
         Row: {
