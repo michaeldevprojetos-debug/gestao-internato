@@ -209,6 +209,7 @@ export type Database = {
           id: string
           mes_referencia: string
           preceptor_id: string | null
+          quantidade_alunos: number
           rotacao_id: string | null
           valor_hora_preceptor: number | null
         }
@@ -221,6 +222,7 @@ export type Database = {
           id?: string
           mes_referencia: string
           preceptor_id?: string | null
+          quantidade_alunos?: number
           rotacao_id?: string | null
           valor_hora_preceptor?: number | null
         }
@@ -233,6 +235,7 @@ export type Database = {
           id?: string
           mes_referencia?: string
           preceptor_id?: string | null
+          quantidade_alunos?: number
           rotacao_id?: string | null
           valor_hora_preceptor?: number | null
         }
