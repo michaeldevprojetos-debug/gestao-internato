@@ -781,20 +781,56 @@ function AlunoMultiSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [options, setOptions] = useState<AlunoSimple[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedAlunosCache, setSelectedAlunosCache] = useState<AlunoSimple[]>([]);
 
-  const filtered = allAlunos.filter(a =>
-    a.nome.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    if (!open && options.length === 0 && !search) return;
+    const fetchAlunos = async () => {
+      setLoading(true);
+      try {
+        let query = supabase.from("alunos").select("id, nome, semestre").order("nome").limit(50);
+        if (search.trim()) {
+          query = query.ilike("nome", `%${search.trim()}%`);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        setOptions(data || []);
+      } catch (err) {
+        console.error("Erro ao buscar alunos:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const toggle = (id: string) => {
-    onChangeAlunoIds(
-      selectedAlunoIds.includes(id)
-        ? selectedAlunoIds.filter(x => x !== id)
-        : [...selectedAlunoIds, id]
-    );
+    const timeoutId = setTimeout(fetchAlunos, 300);
+    return () => clearTimeout(timeoutId);
+  }, [search, open]);
+
+  const toggle = (aluno: AlunoSimple) => {
+    const isSelected = selectedAlunoIds.includes(aluno.id);
+    if (isSelected) {
+      onChangeAlunoIds(selectedAlunoIds.filter(x => x !== aluno.id));
+    } else {
+      onChangeAlunoIds([...selectedAlunoIds, aluno.id]);
+      setSelectedAlunosCache(prev => {
+        if (prev.find(a => a.id === aluno.id)) return prev;
+        return [...prev, aluno];
+      });
+    }
   };
 
-  const selectedAlunos = allAlunos.filter(a => selectedAlunoIds.includes(a.id));
+  const removeId = (id: string) => {
+    onChangeAlunoIds(selectedAlunoIds.filter(x => x !== id));
+  };
+
+  const selectedAlunos = selectedAlunoIds.map(id => {
+    const found = selectedAlunosCache.find(a => a.id === id) 
+               || options.find(a => a.id === id) 
+               || allAlunos.find(a => a.id === id);
+    return found || { id, nome: "Carregando...", semestre: null };
+  });
 
   return (
     <div className="mt-2">
@@ -818,7 +854,7 @@ function AlunoMultiSelect({
               {a.semestre ? ` (${a.semestre}º)` : ""}
               <button
                 type="button"
-                onClick={() => toggle(a.id)}
+                onClick={() => removeId(a.id)}
                 className="ml-0.5 rounded-full p-0.5 hover:bg-foreground/10 transition-colors"
               >
                 <X className="h-2.5 w-2.5" />
@@ -851,15 +887,18 @@ function AlunoMultiSelect({
               onValueChange={setSearch}
             />
             <CommandList className="max-h-48">
-              <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
+              {loading && <div className="p-4 text-center text-xs text-muted-foreground">Buscando...</div>}
+              {!loading && options.length === 0 && (
+                <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
+              )}
               <CommandGroup>
-                {filtered.slice(0, 50).map(a => {
+                {!loading && options.map(a => {
                   const isChecked = selectedAlunoIds.includes(a.id);
                   return (
                     <CommandItem
                       key={a.id}
                       value={a.id}
-                      onSelect={() => toggle(a.id)}
+                      onSelect={() => toggle(a)}
                     >
                       <Check className={cn("mr-2 h-3.5 w-3.5", isChecked ? "opacity-100" : "opacity-0")} />
                       <span className="flex-1 truncate">{a.nome}</span>
@@ -869,9 +908,9 @@ function AlunoMultiSelect({
                     </CommandItem>
                   );
                 })}
-                {filtered.length > 50 && (
+                {!loading && options.length === 50 && (
                   <div className="px-2 py-1.5 text-center text-[10px] text-muted-foreground">
-                    Mostrando 50 de {filtered.length} — refine a busca
+                    Mostrando 50 resultados — refine a busca
                   </div>
                 )}
               </CommandGroup>
