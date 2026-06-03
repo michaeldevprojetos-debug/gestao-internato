@@ -221,7 +221,7 @@ function AlunosPage() {
         <CardContent className="space-y-3 p-4">
           {/* Barra de ferramentas */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative max-w-sm flex-1 min-w-[240px]">
+            <div className="relative max-w-sm flex-1 min-w-60">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder={canSeeCPF ? "Buscar por nome, matrícula ou CPF…" : "Buscar por nome ou matrícula…"}

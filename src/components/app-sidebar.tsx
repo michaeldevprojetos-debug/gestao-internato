@@ -52,7 +52,7 @@ export function AppSidebar() {
                       className="h-10 rounded-lg data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:font-medium hover:bg-accent/40"
                     >
                       <Link to={item.url} className="flex items-center gap-3 px-3">
-                        <item.icon className="h-[18px] w-[18px]" />
+                        <item.icon className="h-4.5 w-4.5" />
                         {!collapsed && <span>{item.title}</span>}
                       </Link>
                     </SidebarMenuButton>

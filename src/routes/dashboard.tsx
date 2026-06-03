@@ -123,18 +123,12 @@ function Dashboard() {
     }
 
     loadDashboard();
-    // Adiciona classe dark ao HTML global para garantir o tema se estivermos nesta página
-    document.documentElement.classList.add("dark");
-    return () => {
-      // Limpar classe caso saia do dashboard
-      document.documentElement.classList.remove("dark");
-    };
   }, []);
 
   const totalCarga = cargaPorSemestre.reduce((s, c) => s + c.value, 0);
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-white -m-4 sm:-m-6 lg:-m-8 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-background text-foreground -m-4 sm:-m-6 lg:-m-8 p-4 sm:p-6 lg:p-8">
       <div className="space-y-6 max-w-7xl mx-auto">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white">Bem-vindo(a), Administrador!</h1>
@@ -153,7 +147,7 @@ function Dashboard() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base text-white font-semibold">Atividades por Período</CardTitle>
               <Select defaultValue="mes">
-                <SelectTrigger className="h-8 w-[130px] bg-white/10 border-white/20 text-white">
+                <SelectTrigger className="h-8 w-32.5 bg-white/10 border-white/20 text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-[#111827] text-white border-white/20">
@@ -176,8 +170,14 @@ function Dashboard() {
                     <XAxis dataKey="semana" stroke="rgba(255,255,255,0.5)" fontSize={11} tickLine={false} axisLine={false} />
                     <YAxis stroke="rgba(255,255,255,0.5)" fontSize={11} tickLine={false} axisLine={false} />
                     <Tooltip
-                      contentStyle={{ background: "rgba(0,0,0,0.8)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, color: "#fff" }}
-                      itemStyle={{ color: "#22c55e" }}
+                      contentStyle={{
+                        backgroundColor: '#1F2937',
+                        borderColor: '#374151',
+                        borderRadius: '0.375rem',
+                        color: '#FFFFFF'
+                      }}
+                      itemStyle={{ color: '#10B981' }}
+                      labelStyle={{ color: '#9CA3AF' }}
                     />
                     <Area type="monotone" dataKey="atividades" stroke="#22c55e" strokeWidth={3} fill="url(#neonGreen)" />
                   </AreaChart>
@@ -196,7 +196,16 @@ function Dashboard() {
                       <Pie data={cargaPorSemestre} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={2} stroke="none">
                         {cargaPorSemestre.map((c) => <Cell key={c.name} fill={c.color} />)}
                       </Pie>
-                      <Tooltip contentStyle={{ background: "rgba(0,0,0,0.8)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, color: "#fff" }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1F2937',
+                          borderColor: '#374151',
+                          borderRadius: '0.375rem',
+                          color: '#FFFFFF'
+                        }}
+                        itemStyle={{ color: '#10B981' }}
+                        labelStyle={{ color: '#9CA3AF' }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </ClientOnly>

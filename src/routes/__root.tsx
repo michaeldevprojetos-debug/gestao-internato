@@ -16,8 +16,9 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { useRouterState, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Sun, Moon } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
+import { useTheme } from "@/hooks/use-theme";
 
 function NotFoundComponent() {
   return (
@@ -146,6 +147,7 @@ function AppShell() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { user, logout, ready } = useAuth();
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
   const isLogin = pathname === "/";
 
   useEffect(() => {
@@ -174,6 +176,19 @@ function AppShell() {
               <span className="text-xs text-muted-foreground">Custo Real do Internato</span>
             </div>
             <div className="ml-auto flex items-center gap-3">
+              {/* Theme Toggle */}
+              <button
+                id="theme-toggle"
+                onClick={toggleTheme}
+                title={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/60 text-foreground transition-all hover:bg-accent hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4 text-yellow-400" />
+                ) : (
+                  <Moon className="h-4 w-4 text-slate-600" />
+                )}
+              </button>
               <div className="hidden flex-col items-end leading-tight sm:flex">
                 <span className="text-xs font-medium">{user.nome}</span>
                 <span className="text-[10px] uppercase tracking-wide text-muted-foreground">

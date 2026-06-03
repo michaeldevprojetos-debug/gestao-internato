@@ -81,6 +81,37 @@
   --radius: 0.5rem;
 }
 
+/* ─── Tema Escuro ──────────────────────────────────────────────────────────── */
+.dark {
+  --background: #090D16;
+  --foreground: #F9FAFB;
+  --card: #111827;
+  --card-foreground: #F9FAFB;
+  --popover: #1F2937;
+  --popover-foreground: #F9FAFB;
+  --primary: oklch(0.5234 0.1347 144.1672);
+  --primary-foreground: #ffffff;
+  --secondary: #1F2937;
+  --secondary-foreground: #D1FAE5;
+  --muted: #1F2937;
+  --muted-foreground: #9CA3AF;
+  --accent: rgba(255, 255, 255, 0.07);
+  --accent-foreground: #F9FAFB;
+  --destructive: oklch(0.5386 0.1937 26.7249);
+  --destructive-foreground: #ffffff;
+  --border: #374151;
+  --input: #374151;
+  --ring: oklch(0.5234 0.1347 144.1672);
+  --sidebar: #0D1320;
+  --sidebar-foreground: #E5E7EB;
+  --sidebar-primary: oklch(0.5234 0.1347 144.1672);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(22, 163, 74, 0.12);
+  --sidebar-accent-foreground: #4ade80;
+  --sidebar-border: #1F2937;
+  --sidebar-ring: oklch(0.5234 0.1347 144.1672);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -90,6 +121,7 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
 
@@ -99,31 +131,53 @@
 ----------------------------------------------------------------------------*/
 @layer utilities {
 
-  /* Sidebar — itens inativos no hover */
-  [data-sidebar="menu-button"]:not([data-active="true"]):hover {
+  /* Sidebar — itens inativos no hover (light) */
+  :not(.dark) [data-sidebar="menu-button"]:not([data-active="true"]):hover {
     background-color: oklch(0.9100 0 0) !important;
-    /* ~slate-200 */
     color: var(--foreground) !important;
   }
 
-  /* Botões ghost (ações de tabela: editar / excluir) */
-  .hover\:bg-accent:hover,
-  [data-slot="button"][class*="ghost"]:hover,
-  [data-slot="button"][class*="outline"]:hover {
-    background-color: oklch(0.9000 0 0) !important;
-    /* ~slate-200 mais escuro */
+  /* Sidebar — itens inativos no hover (dark) */
+  .dark [data-sidebar="menu-button"]:not([data-active="true"]):hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #F9FAFB !important;
   }
 
-  /* Linhas de tabela */
-  tbody tr:hover {
+  /* Botões ghost (light) */
+  :not(.dark) .hover\:bg-accent:hover,
+  :not(.dark) [data-slot="button"][class*="ghost"]:hover,
+  :not(.dark) [data-slot="button"][class*="outline"]:hover {
+    background-color: oklch(0.9000 0 0) !important;
+  }
+
+  /* Botões ghost (dark) */
+  .dark [data-slot="button"][class*="ghost"]:hover,
+  .dark [data-slot="button"][class*="outline"]:hover {
+    background-color: rgba(255, 255, 255, 0.10) !important;
+  }
+
+  /* Linhas de tabela (light) */
+  :not(.dark) tbody tr:hover {
     background-color: oklch(0.9400 0.0050 80) !important;
   }
 
-  /* Dropdown / Select itens em foco/hover */
-  [data-slot="select-item"]:hover,
-  [data-slot="dropdown-menu-item"]:hover,
-  [data-highlighted] {
+  /* Linhas de tabela (dark) */
+  .dark tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  /* Dropdown / Select itens em foco/hover (light) */
+  :not(.dark) [data-slot="select-item"]:hover,
+  :not(.dark) [data-slot="dropdown-menu-item"]:hover,
+  :not(.dark) [data-highlighted] {
     background-color: oklch(0.9000 0.0300 145) !important;
+  }
+
+  /* Dropdown / Select itens em foco/hover (dark) */
+  .dark [data-slot="select-item"]:hover,
+  .dark [data-slot="dropdown-menu-item"]:hover,
+  .dark [data-highlighted] {
+    background-color: rgba(22, 163, 74, 0.15) !important;
   }
 
   /* --- Dashboard Dark Theme Enhancements --- */
