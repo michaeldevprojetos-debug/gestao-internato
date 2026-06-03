@@ -621,27 +621,38 @@ function PreceptorCard({
       }`}
     >
       <div>
-        <div className="flex justify-between items-start gap-2 mb-2">
-          <div className="min-w-0">
-            <p className="font-semibold text-sm leading-tight text-foreground truncate">
-              {p.nome}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {p.especialidade || "Sem especialidade"}
-            </p>
-          </div>
+        {/* Formato: Preceptor [Nome] — Quantidade de alunos: N — (nomes)  +  badge especialidade */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
+          <span className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+            Preceptor
+          </span>
+          <span className="font-semibold text-sm text-foreground">{p.nome}</span>
+          {p.especialidade && (
+            <Badge variant="outline" className="text-[10px] py-0">
+              {p.especialidade}
+            </Badge>
+          )}
+        </div>
+
+        <div className="text-xs text-foreground/80 leading-snug">
+          <span className="font-semibold">Quantidade de alunos:</span>{" "}
           <Badge
             variant={exceeded ? "destructive" : "secondary"}
-            className="shrink-0 text-[10px]"
+            className="text-[10px] py-0 px-1.5"
           >
-            {p.alunosCount} {p.alunosCount === 1 ? "aluno" : "alunos"}
+            {p.alunosCount}
           </Badge>
+          {students.length > 0 && (
+            <span className="text-muted-foreground">
+              {" "}— ({students.map(s => s.aluno_nome).join(", ")})
+            </span>
+          )}
         </div>
 
         {/* ── Input de Quantidade de Alunos ── */}
         <div className="flex items-center gap-2 mt-2 p-2 rounded-md bg-muted/40 border border-border/50">
           <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
-            Qtd. Alunos:
+            Quantidade de alunos por preceptor(a):
           </Label>
           <Input
             type="number"
@@ -652,22 +663,6 @@ function PreceptorCard({
             onClick={e => e.stopPropagation()}
           />
         </div>
-
-        {students.length > 0 && (
-          <div className="mt-2.5 pt-2 border-t border-border/50 space-y-1">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-              Alunos:
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {students.map((s, idx) => (
-                <Badge key={idx} variant="outline" className="text-[10px] py-0.5">
-                  {s.aluno_nome}
-                  {s.aluno_semestre ? ` (${s.aluno_semestre}º)` : ""}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {exceeded && (
