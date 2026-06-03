@@ -9,12 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   Plus, Pencil, Building2, AlertCircle, Search,
   ChevronRight, ChevronDown, Settings2, Users, Trash2, X,
+  ChevronsUpDown, Check, GraduationCap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -23,6 +27,18 @@ type PreceptorSimple = {
   nome: string;
   especialidade: string | null;
   local_id: string | null;
+};
+
+type AlunoSimple = {
+  id: string;
+  nome: string;
+  semestre: number | null;
+};
+
+type LocalSimple = {
+  id: string;
+  nome: string;
+  tipo: string;
 };
 
 type VinculoQtd = {
@@ -97,18 +113,20 @@ function HospitaisPage() {
   const [locais, setLocais]           = useState<LocalRow[]>([]);
   const [filtered, setFiltered]       = useState<LocalRow[]>([]);
   const [allPreceptores, setAllPreceptores] = useState<PreceptorSimple[]>([]);
+  const [allLocaisSimple, setAllLocaisSimple] = useState<LocalSimple[]>([]);
+  const [allAlunos, setAllAlunos]     = useState<AlunoSimple[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
   const [query, setQuery]             = useState("");
   const [limiteAlunos, setLimiteAlunos] = useState(4);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [dialogOpen, setDialogOpen]   = useState(false);
-  const [editingLocal, setEditingLocal] = useState<LocalRow | null>(null); // null = nova
+  const [editingLocal, setEditingLocal] = useState<LocalRow | null>(null);
 
   const toggleRow = (id: string) =>
     setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
 
-  // ── Busca e agrega dados da tabela locais ───────────────────────────────────
+  // ── Busca e agrega dados ───────────────────────────────────────────────────
   const fetchLocais = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -120,7 +138,9 @@ function HospitaisPage() {
         .order("nome");
       if (err1) throw err1;
 
-      // 2. Todos os preceptores com local_id
+      setAllLocaisSimple((locaisData ?? []) as LocalSimple[]);
+
+      // 2. Todos os preceptores
       const { data: preceptoresData, error: err2 } = await supabase
         .from("preceptores")
         .select("id, nome, especialidade, local_id")
@@ -129,23 +149,32 @@ function HospitaisPage() {
 
       setAllPreceptores((preceptoresData ?? []) as PreceptorSimple[]);
 
-      // 3. Vínculos operacionais com alunos e quantidade_alunos
+      // 3. Todos os alunos
+      const { data: alunosData, error: errAlunos } = await supabase
+        .from("alunos")
+        .select("id, nome, semestre")
+        .order("nome");
+      if (errAlunos) throw errAlunos;
+
+      setAllAlunos((alunosData ?? []).map(a => ({
+        id: a.id,
+        nome: a.nome,
+        semestre: a.semestre,
+      })));
+
+      // 4. Vínculos operacionais
       const { data: vinculosData, error: err3 } = await supabase
         .from("vinculo_operacional")
         .select("id, preceptor_id, aluno_id, quantidade_alunos, alunos ( nome, semestre )");
       if (err3) throw err3;
 
-      // Map: preceptor_id → Set<aluno_id> (contagem única de alunos)
       type AlunoInfo = { nome: string; semestre: number | null };
       const preceptorAlunosSet  = new Map<string, Set<string>>();
       const preceptorStudents   = new Map<string, AlunoInfo[]>();
-      // Map: preceptor_id → { vinculoId, quantidade_alunos } (pegar o primeiro vínculo para controle)
       const preceptorQtd = new Map<string, VinculoQtd>();
 
       for (const v of vinculosData ?? []) {
         if (!v.preceptor_id) continue;
-
-        // Registrar quantidade de alunos por vínculo
         if (!preceptorQtd.has(v.preceptor_id)) {
           preceptorQtd.set(v.preceptor_id, {
             id: v.id,
@@ -153,7 +182,6 @@ function HospitaisPage() {
             quantidade_alunos: v.quantidade_alunos ?? 0,
           });
         }
-
         if (!v.aluno_id) continue;
         if (!preceptorAlunosSet.has(v.preceptor_id)) {
           preceptorAlunosSet.set(v.preceptor_id, new Set());
@@ -169,7 +197,6 @@ function HospitaisPage() {
         }
       }
 
-      // Monta LocalRow[] cruzando locais ← preceptores ← vinculo_operacional
       const rows: LocalRow[] = (locaisData ?? []).map(local => {
         const unitPreceptors  = (preceptoresData ?? []).filter(p => p.local_id === local.id);
         const activePreceptors = unitPreceptors.filter(p => (preceptorAlunosSet.get(p.id)?.size ?? 0) > 0);
@@ -224,7 +251,6 @@ function HospitaisPage() {
 
   useEffect(() => { fetchLocais(); }, [fetchLocais]);
 
-  // Filtro local por nome
   useEffect(() => {
     const q = query.trim().toLowerCase();
     setFiltered(q ? locais.filter(l => l.nome.toLowerCase().includes(q)) : locais);
@@ -236,14 +262,12 @@ function HospitaisPage() {
   async function handleDeleteLocal(localId: string, localNome: string) {
     if (!window.confirm(`Tem certeza que deseja excluir a unidade "${localNome}"?\n\nOs preceptores associados serão desvinculados.`)) return;
     try {
-      // 1. Desvincular preceptores (set local_id = null)
       const { error: err1 } = await supabase
         .from("preceptores")
         .update({ local_id: null })
         .eq("local_id", localId);
       if (err1) throw err1;
 
-      // 2. Deletar o local
       const { error: err2 } = await supabase
         .from("locais")
         .delete()
@@ -261,14 +285,12 @@ function HospitaisPage() {
   async function handleUpdateQuantidade(vinculoId: string | null, preceptorId: string, newValue: number) {
     try {
       if (vinculoId) {
-        // Update direto no vínculo existente
         const { error } = await supabase
           .from("vinculo_operacional")
           .update({ quantidade_alunos: newValue })
           .eq("id", vinculoId);
         if (error) throw error;
       } else {
-        // Criar novo vínculo com quantidade
         const { error } = await supabase
           .from("vinculo_operacional")
           .insert({
@@ -278,7 +300,6 @@ function HospitaisPage() {
           });
         if (error) throw error;
       }
-      // Atualizar localmente para feedback imediato
       setLocais(prev => prev.map(l => ({
         ...l,
         preceptoresList: l.preceptoresList.map(p =>
@@ -311,7 +332,7 @@ function HospitaisPage() {
         </Button>
       </div>
 
-      {/* ── Cards de contagem (Hospital / UPA / Maternidade) ── */}
+      {/* ── Cards de contagem ── */}
       {!loading && !error && (
         <div className="grid gap-4 sm:grid-cols-3">
           {(["Hospital", "UPA", "Maternidade"] as const).map(tipo => (
@@ -344,7 +365,6 @@ function HospitaisPage() {
       {/* ── Tabela principal ── */}
       <Card>
         <CardContent className="space-y-3 p-4">
-          {/* Busca + controle de limite */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="relative w-full max-w-xs">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -408,7 +428,6 @@ function HospitaisPage() {
 
                         return (
                           <Fragment key={u.id}>
-                            {/* ── Linha principal ── */}
                             <TableRow
                               className="hover:bg-muted/50 cursor-pointer transition-colors"
                               onClick={() => toggleRow(u.id)}
@@ -454,7 +473,6 @@ function HospitaisPage() {
 
                               <TableCell className="text-right font-semibold">{u.totalPreceptores}</TableCell>
 
-                              {/* ── Nova coluna: Alunos Vinculados ── */}
                               <TableCell className="text-right">
                                 <Badge
                                   variant={u.totalAlunosVinculados > 0 ? "secondary" : "outline"}
@@ -464,7 +482,6 @@ function HospitaisPage() {
                                 </Badge>
                               </TableCell>
 
-                              {/* ── Nova coluna: Limite Individual ── */}
                               <TableCell className="text-right">
                                 <span className="text-xs text-muted-foreground font-medium">
                                   {limiteAlunos} / preceptor
@@ -550,6 +567,8 @@ function HospitaisPage() {
         onOpenChange={setDialogOpen}
         local={editingLocal}
         allPreceptores={allPreceptores}
+        allLocaisSimple={allLocaisSimple}
+        allAlunos={allAlunos}
         onSaved={() => {
           setDialogOpen(false);
           fetchLocais();
@@ -637,16 +656,14 @@ function PreceptorCard({
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Alunos:
             </p>
-            {students.map((s, idx) => (
-              <div key={idx} className="flex justify-between text-xs text-foreground/80 py-0.5">
-                <span className="truncate max-w-[160px]">
-                  {idx + 1}. {s.aluno_nome}
-                </span>
-                <span className="text-muted-foreground shrink-0">
-                  {s.aluno_semestre ? `${s.aluno_semestre}º sem.` : "—"}
-                </span>
-              </div>
-            ))}
+            <div className="flex flex-wrap gap-1">
+              {students.map((s, idx) => (
+                <Badge key={idx} variant="outline" className="text-[10px] py-0.5">
+                  {s.aluno_nome}
+                  {s.aluno_semestre ? ` (${s.aluno_semestre}º)` : ""}
+                </Badge>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -661,7 +678,215 @@ function PreceptorCard({
   );
 }
 
-// ─── Modal: Gerenciar Unidade ─────────────────────────────────────────────────
+// ─── Combobox Inteligente (Popover + Command com escrita livre) ────────────────
+
+function SmartCombobox({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  emptyMessage,
+  id,
+}: {
+  value: string;
+  onValueChange: (val: string) => void;
+  options: Array<{ value: string; label: string }>;
+  placeholder: string;
+  emptyMessage: string;
+  id?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  // Quando abre, sincroniza o campo de busca com o valor atual
+  useEffect(() => {
+    if (open) setSearch(value);
+  }, [open, value]);
+
+  const filtered = options.filter(o =>
+    o.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          id={id}
+          className="w-full justify-between font-normal h-9 text-sm"
+        >
+          <span className={cn("truncate", !value && "text-muted-foreground")}>
+            {value || placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder={`Buscar ou digitar…`}
+            value={search}
+            onValueChange={setSearch}
+          />
+          <CommandList>
+            {filtered.length === 0 && !search.trim() && (
+              <CommandEmpty>{emptyMessage}</CommandEmpty>
+            )}
+            {search.trim() && !filtered.some(o => o.label.toLowerCase() === search.toLowerCase()) && (
+              <CommandItem
+                value={`__create__${search}`}
+                onSelect={() => {
+                  onValueChange(search.trim());
+                  setOpen(false);
+                }}
+                className="text-primary"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Usar: &ldquo;{search.trim()}&rdquo;
+              </CommandItem>
+            )}
+            <CommandGroup>
+              {filtered.map(option => (
+                <CommandItem
+                  key={option.value}
+                  value={option.value}
+                  onSelect={() => {
+                    onValueChange(option.label);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === option.label ? "opacity-100" : "opacity-0")} />
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ─── Multi-select de Alunos por Preceptor ─────────────────────────────────────
+
+function AlunoMultiSelect({
+  allAlunos,
+  selectedAlunoIds,
+  onChangeAlunoIds,
+  preceptorNome,
+}: {
+  allAlunos: AlunoSimple[];
+  selectedAlunoIds: string[];
+  onChangeAlunoIds: (ids: string[]) => void;
+  preceptorNome: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filtered = allAlunos.filter(a =>
+    a.nome.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggle = (id: string) => {
+    onChangeAlunoIds(
+      selectedAlunoIds.includes(id)
+        ? selectedAlunoIds.filter(x => x !== id)
+        : [...selectedAlunoIds, id]
+    );
+  };
+
+  const selectedAlunos = allAlunos.filter(a => selectedAlunoIds.includes(a.id));
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          Vincular alunos a {preceptorNome}
+        </span>
+      </div>
+
+      {/* Tags dos selecionados */}
+      {selectedAlunos.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {selectedAlunos.map(a => (
+            <Badge
+              key={a.id}
+              variant="secondary"
+              className="pl-2 pr-1 py-0.5 gap-0.5 text-[10px] cursor-default"
+            >
+              {a.nome}
+              {a.semestre ? ` (${a.semestre}º)` : ""}
+              <button
+                type="button"
+                onClick={() => toggle(a.id)}
+                className="ml-0.5 rounded-full p-0.5 hover:bg-foreground/10 transition-colors"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-between h-8 text-xs font-normal"
+          >
+            <span className="text-muted-foreground truncate">
+              {selectedAlunoIds.length > 0
+                ? `${selectedAlunoIds.length} aluno(s) selecionado(s)`
+                : "Selecionar alunos…"}
+            </span>
+            <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Buscar aluno…"
+              value={search}
+              onValueChange={setSearch}
+            />
+            <CommandList className="max-h-48">
+              <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
+              <CommandGroup>
+                {filtered.slice(0, 50).map(a => {
+                  const isChecked = selectedAlunoIds.includes(a.id);
+                  return (
+                    <CommandItem
+                      key={a.id}
+                      value={a.id}
+                      onSelect={() => toggle(a.id)}
+                    >
+                      <Check className={cn("mr-2 h-3.5 w-3.5", isChecked ? "opacity-100" : "opacity-0")} />
+                      <span className="flex-1 truncate">{a.nome}</span>
+                      {a.semestre && (
+                        <span className="text-muted-foreground text-[10px] ml-2">{a.semestre}º sem.</span>
+                      )}
+                    </CommandItem>
+                  );
+                })}
+                {filtered.length > 50 && (
+                  <div className="px-2 py-1.5 text-center text-[10px] text-muted-foreground">
+                    Mostrando 50 de {filtered.length} — refine a busca
+                  </div>
+                )}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+// ─── Modal: Gerenciar Unidade (Formulário Inteligente) ────────────────────────
 
 type TagPreceptor = {
   type: "existing";
@@ -674,24 +899,27 @@ type TagPreceptor = {
 };
 
 function GerenciarUnidadeDialog({
-  open, onOpenChange, local, allPreceptores, onSaved,
+  open, onOpenChange, local, allPreceptores, allLocaisSimple, allAlunos, onSaved,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   local: LocalRow | null;
   allPreceptores: PreceptorSimple[];
+  allLocaisSimple: LocalSimple[];
+  allAlunos: AlunoSimple[];
   onSaved: () => void;
 }) {
   const isNew = !local;
 
-  const [nome,            setNome]            = useState("");
-  const [tipo,            setTipo]            = useState<string>("Outro");
-  const [especialidade,   setEspecialidade]   = useState<string>("");
+  const [nome,              setNome]            = useState("");
+  const [tipo,              setTipo]            = useState<string>("Outro");
+  const [especialidade,     setEspecialidade]   = useState<string>("");
   const [especialidadeCustom, setEspecialidadeCustom] = useState("");
-  const [qtdAlunosInicial, setQtdAlunosInicial] = useState(0);
-  const [selectedTags,    setSelectedTags]    = useState<TagPreceptor[]>([]);
-  const [preceptorSearch, setPreceptorSearch] = useState("");
-  const [saving,          setSaving]          = useState(false);
+  const [selectedTags,      setSelectedTags]    = useState<TagPreceptor[]>([]);
+  const [preceptorSearch,   setPreceptorSearch] = useState("");
+  const [saving,            setSaving]          = useState(false);
+  // Per-preceptor student selections: Map<preceptorKey, string[]>
+  const [preceptorAlunos,   setPreceptorAlunos] = useState<Record<string, string[]>>({});
 
   // Popula o formulário ao abrir
   useEffect(() => {
@@ -700,22 +928,51 @@ function GerenciarUnidadeDialog({
     setTipo(local?.tipo ?? "Outro");
     setEspecialidade("");
     setEspecialidadeCustom("");
-    setQtdAlunosInicial(0);
     setSelectedTags(
       local?.preceptoresList.map(p => ({ type: "existing" as const, id: p.id, nome: p.nome })) ?? []
     );
     setPreceptorSearch("");
-  }, [open, local]);
+    // Initialize per-preceptor aluno selections from existing data
+    const initialAlunos: Record<string, string[]> = {};
+    if (local) {
+      for (const p of local.preceptoresList) {
+        const studentIds = local.alunosVinculados
+          .filter(a => a.preceptor_id === p.id)
+          .map(a => {
+            // Find the actual aluno id by name
+            const found = allAlunos.find(al => al.nome === a.aluno_nome);
+            return found?.id;
+          })
+          .filter(Boolean) as string[];
+        if (studentIds.length > 0) initialAlunos[p.id] = studentIds;
+      }
+    }
+    setPreceptorAlunos(initialAlunos);
+  }, [open, local, allAlunos]);
 
   const toggleExisting = (p: PreceptorSimple) => {
     setSelectedTags(prev => {
       const exists = prev.find(t => t.type === "existing" && t.id === p.id);
-      if (exists) return prev.filter(t => !(t.type === "existing" && t.id === p.id));
+      if (exists) {
+        // Remove from tags and clear aluno selections
+        setPreceptorAlunos(pa => {
+          const copy = { ...pa };
+          delete copy[p.id];
+          return copy;
+        });
+        return prev.filter(t => !(t.type === "existing" && t.id === p.id));
+      }
       return [...prev, { type: "existing", id: p.id, nome: p.nome }];
     });
   };
 
   const removeTag = (tag: TagPreceptor) => {
+    const key = tag.type === "existing" ? tag.id : tag.tempId;
+    setPreceptorAlunos(pa => {
+      const copy = { ...pa };
+      delete copy[key];
+      return copy;
+    });
     setSelectedTags(prev => {
       if (tag.type === "existing") return prev.filter(t => !(t.type === "existing" && t.id === tag.id));
       return prev.filter(t => !(t.type === "new" && t.tempId === tag.tempId));
@@ -727,7 +984,6 @@ function GerenciarUnidadeDialog({
     e.preventDefault();
     const searchLower = preceptorSearch.trim().toLowerCase();
 
-    // Check if already selected or if an existing preceptor matches
     const matchingExisting = allPreceptores.find(p => p.nome.toLowerCase() === searchLower);
     if (matchingExisting) {
       const alreadySelected = selectedTags.find(t => t.type === "existing" && t.id === matchingExisting.id);
@@ -738,14 +994,12 @@ function GerenciarUnidadeDialog({
       return;
     }
 
-    // Check if already added as new tag
     const alreadyNew = selectedTags.find(t => t.type === "new" && t.nome.toLowerCase() === searchLower);
     if (alreadyNew) {
       setPreceptorSearch("");
       return;
     }
 
-    // Create new temporary tag
     setSelectedTags(prev => [...prev, {
       type: "new",
       nome: preceptorSearch.trim(),
@@ -760,6 +1014,29 @@ function GerenciarUnidadeDialog({
 
   const isSelected = (id: string) => selectedTags.some(t => t.type === "existing" && t.id === id);
 
+  // Compute total alunos across all preceptors
+  const totalAlunosSelecionados = Object.values(preceptorAlunos).reduce((sum, ids) => sum + ids.length, 0);
+
+  // Helper to update aluno selections for a specific preceptor key
+  const updatePreceptorAlunos = (key: string, ids: string[]) => {
+    setPreceptorAlunos(prev => ({ ...prev, [key]: ids }));
+  };
+
+  // Combobox options from locais list
+  const locaisOptions = allLocaisSimple.map(l => ({
+    value: l.id,
+    label: l.nome,
+  }));
+
+  // Auto-detect tipo when selecting an existing local
+  const handleNomeChange = (val: string) => {
+    setNome(val);
+    const matchedLocal = allLocaisSimple.find(l => l.nome === val);
+    if (matchedLocal) {
+      setTipo(matchedLocal.tipo);
+    }
+  };
+
   async function handleSave() {
     if (!nome.trim()) { toast.warning("Informe o nome da unidade."); return; }
     setSaving(true);
@@ -767,15 +1044,28 @@ function GerenciarUnidadeDialog({
       let localId = local?.id;
       const finalEspecialidade = especialidade === "Outra" ? especialidadeCustom.trim() : especialidade;
 
-      // ── Criar ou atualizar o local ──
+      // ── Verificar se o local já existe pelo nome ou criar novo ──
+      const matchedLocal = allLocaisSimple.find(l => l.nome.toLowerCase() === nome.trim().toLowerCase());
+
       if (isNew) {
-        const { data, error } = await supabase
-          .from("locais")
-          .insert({ nome: nome.trim(), tipo })
-          .select("id")
-          .single();
-        if (error) throw error;
-        localId = data.id;
+        if (matchedLocal) {
+          // Local já existe, usar o ID existente e atualizar tipo se necessário
+          localId = matchedLocal.id;
+          const { error } = await supabase
+            .from("locais")
+            .update({ tipo })
+            .eq("id", localId);
+          if (error) throw error;
+        } else {
+          // Criar novo local
+          const { data, error } = await supabase
+            .from("locais")
+            .insert({ nome: nome.trim(), tipo })
+            .select("id")
+            .single();
+          if (error) throw error;
+          localId = data.id;
+        }
       } else {
         const { error } = await supabase
           .from("locais")
@@ -786,10 +1076,10 @@ function GerenciarUnidadeDialog({
 
       // ── Criar preceptores temporários (tags novas) ──
       const newTags = selectedTags.filter(t => t.type === "new");
-      const createdIds: string[] = [];
+      const tempIdToRealId = new Map<string, string>();
 
       for (const tag of newTags) {
-        const insertData: any = {
+        const insertData: Record<string, any> = {
           nome: tag.nome,
           local_id: localId,
         };
@@ -801,7 +1091,7 @@ function GerenciarUnidadeDialog({
           .select("id")
           .single();
         if (error) throw error;
-        createdIds.push(data.id);
+        tempIdToRealId.set(tag.tempId, data.id);
       }
 
       // ── Vincular preceptores existentes selecionados ──
@@ -809,7 +1099,8 @@ function GerenciarUnidadeDialog({
         .filter(t => t.type === "existing")
         .map(t => (t as { type: "existing"; id: string }).id);
 
-      const allSelectedIds = [...existingIds, ...createdIds];
+      const newCreatedIds = Array.from(tempIdToRealId.values());
+      const allSelectedIds = [...existingIds, ...newCreatedIds];
 
       if (allSelectedIds.length > 0) {
         const { error } = await supabase
@@ -818,7 +1109,6 @@ function GerenciarUnidadeDialog({
           .in("id", allSelectedIds);
         if (error) throw error;
 
-        // Se é nova unidade ou tem especialidade, atualizar especialidade dos preceptores
         if (finalEspecialidade && existingIds.length > 0) {
           const { error: errEsp } = await supabase
             .from("preceptores")
@@ -828,16 +1118,48 @@ function GerenciarUnidadeDialog({
         }
       }
 
-      // ── Criar vínculos operacionais com quantidade_alunos ──
-      if (qtdAlunosInicial > 0 && allSelectedIds.length > 0) {
-        const vinculos = allSelectedIds.map(pid => ({
-          preceptor_id: pid,
-          quantidade_alunos: qtdAlunosInicial,
-          mes_referencia: new Date().toISOString().slice(0, 7),
-        }));
+      // ── Criar vínculos operacionais com alunos selecionados ──
+      const vinculosToInsert: Array<{
+        preceptor_id: string;
+        aluno_id: string;
+        quantidade_alunos: number;
+        mes_referencia: string;
+      }> = [];
+
+      for (const tag of selectedTags) {
+        const key = tag.type === "existing" ? tag.id : tag.tempId;
+        const realPreceptorId = tag.type === "existing"
+          ? tag.id
+          : tempIdToRealId.get(tag.tempId);
+        if (!realPreceptorId) continue;
+
+        const selectedStudents = preceptorAlunos[key] ?? [];
+        const qtd = selectedStudents.length;
+
+        if (selectedStudents.length > 0) {
+          for (const alunoId of selectedStudents) {
+            vinculosToInsert.push({
+              preceptor_id: realPreceptorId,
+              aluno_id: alunoId,
+              quantidade_alunos: qtd,
+              mes_referencia: new Date().toISOString().slice(0, 7),
+            });
+          }
+        } else if (qtd === 0) {
+          // Criar vínculo sem aluno mas com quantidade 0
+          vinculosToInsert.push({
+            preceptor_id: realPreceptorId,
+            aluno_id: null as any,
+            quantidade_alunos: 0,
+            mes_referencia: new Date().toISOString().slice(0, 7),
+          });
+        }
+      }
+
+      if (vinculosToInsert.length > 0) {
         const { error } = await supabase
           .from("vinculo_operacional")
-          .insert(vinculos);
+          .insert(vinculosToInsert);
         if (error) throw error;
       }
 
@@ -865,7 +1187,7 @@ function GerenciarUnidadeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="h-5 w-5 text-primary" />
@@ -874,15 +1196,17 @@ function GerenciarUnidadeDialog({
         </DialogHeader>
 
         <div className="grid gap-5 py-2 max-h-[65vh] overflow-y-auto pr-1">
-          {/* Nome + Tipo */}
+          {/* ── Nome (Combobox) + Tipo ── */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="g-nome">Nome da Unidade *</Label>
-              <Input
+              <SmartCombobox
                 id="g-nome"
                 value={nome}
-                onChange={e => setNome(e.target.value)}
+                onValueChange={handleNomeChange}
+                options={locaisOptions}
                 placeholder="Ex.: Hospital Municipal de Salvador"
+                emptyMessage="Nenhum local cadastrado."
               />
             </div>
             <div className="grid gap-2">
@@ -900,7 +1224,7 @@ function GerenciarUnidadeDialog({
             </div>
           </div>
 
-          {/* Alocar Preceptores */}
+          {/* ── Alocar Preceptores ── */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Users className="h-4 w-4 text-muted-foreground" />
@@ -955,7 +1279,7 @@ function GerenciarUnidadeDialog({
                   }
                 </div>
               ) : (
-                visiblePreceptores.map(p => {
+                visiblePreceptores.slice(0, 50).map(p => {
                   const checked     = isSelected(p.id);
                   const otherLocal  = p.local_id && p.local_id !== local?.id;
 
@@ -988,6 +1312,11 @@ function GerenciarUnidadeDialog({
                   );
                 })
               )}
+              {visiblePreceptores.length > 50 && (
+                <div className="px-3 py-2 text-center text-[10px] text-muted-foreground border-t">
+                  Mostrando 50 de {visiblePreceptores.length} — refine a busca
+                </div>
+              )}
             </div>
 
             {allPreceptores.length === 0 && !preceptorSearch && (
@@ -997,45 +1326,85 @@ function GerenciarUnidadeDialog({
             )}
           </div>
 
-          {/* ── Especialidade + Quantidade de Alunos Inicial ── */}
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="g-especialidade">Especialidade</Label>
-              <Select value={especialidade} onValueChange={setEspecialidade}>
-                <SelectTrigger id="g-especialidade">
-                  <SelectValue placeholder="Selecione a especialidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ESPECIALIDADES_COMUNS.map(e => (
-                    <SelectItem key={e} value={e}>{e}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {especialidade === "Outra" && (
-                <Input
-                  placeholder="Digite a especialidade…"
-                  value={especialidadeCustom}
-                  onChange={e => setEspecialidadeCustom(e.target.value)}
-                  className="mt-1"
-                />
-              )}
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="g-qtd-alunos">Quantidade de Alunos Inicial</Label>
+          {/* ── Especialidade ── */}
+          <div className="grid gap-2">
+            <Label htmlFor="g-especialidade">Especialidade</Label>
+            <Select value={especialidade} onValueChange={setEspecialidade}>
+              <SelectTrigger id="g-especialidade">
+                <SelectValue placeholder="Selecione a especialidade" />
+              </SelectTrigger>
+              <SelectContent>
+                {ESPECIALIDADES_COMUNS.map(e => (
+                  <SelectItem key={e} value={e}>{e}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {especialidade === "Outra" && (
               <Input
-                id="g-qtd-alunos"
-                type="number"
-                min={0}
-                value={qtdAlunosInicial}
-                onChange={e => setQtdAlunosInicial(Math.max(0, Number(e.target.value)))}
-                className="font-bold"
-                placeholder="0"
+                placeholder="Digite a especialidade…"
+                value={especialidadeCustom}
+                onChange={e => setEspecialidadeCustom(e.target.value)}
+                className="mt-1"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Valor inicial de alunos para cada preceptor vinculado.
-              </p>
-            </div>
+            )}
           </div>
+
+          {/* ── Vinculação de Alunos por Preceptor ── */}
+          {selectedTags.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">Quantidade de alunos por preceptor(a)</p>
+                </div>
+                <Badge variant="outline" className="text-xs font-bold">
+                  Total: {totalAlunosSelecionados} aluno(s)
+                </Badge>
+              </div>
+
+              <div className="space-y-3">
+                {selectedTags.map(tag => {
+                  const key = tag.type === "existing" ? tag.id : tag.tempId;
+                  const alunoIds = preceptorAlunos[key] ?? [];
+
+                  return (
+                    <div
+                      key={key}
+                      className="rounded-lg border border-border/60 bg-muted/10 p-3"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-sm font-semibold">{tag.nome}</span>
+                          {tag.type === "new" && (
+                            <Badge variant="default" className="text-[9px] py-0 px-1.5">(novo)</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                            Qtd. alunos:
+                          </span>
+                          <Badge
+                            variant={alunoIds.length > 0 ? "secondary" : "outline"}
+                            className="font-bold text-xs min-w-[28px] justify-center"
+                          >
+                            {alunoIds.length}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <AlunoMultiSelect
+                        allAlunos={allAlunos}
+                        selectedAlunoIds={alunoIds}
+                        onChangeAlunoIds={(ids) => updatePreceptorAlunos(key, ids)}
+                        preceptorNome={tag.nome}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">
