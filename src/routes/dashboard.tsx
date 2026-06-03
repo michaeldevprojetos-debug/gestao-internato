@@ -22,9 +22,9 @@ function Stat({ icon: Icon, value, label, hint }: { icon: any; value: string | n
           <Icon className="h-6 w-6" />
         </div>
         <div className="leading-tight">
-          <p className="text-3xl font-bold text-white">{value}</p>
-          <p className="text-sm font-medium text-white/90">{label}</p>
-          {hint && <p className="text-xs text-white/60">{hint}</p>}
+          <p className="text-3xl font-bold text-slate-900 dark:text-white">{value}</p>
+          <p className="text-sm font-medium text-slate-700 dark:text-white/90">{label}</p>
+          {hint && <p className="text-xs text-slate-500 dark:text-white/60">{hint}</p>}
         </div>
       </CardContent>
     </Card>
@@ -131,8 +131,8 @@ function Dashboard() {
     <div className="min-h-screen bg-background text-foreground -m-4 sm:-m-6 lg:-m-8 p-4 sm:p-6 lg:p-8">
       <div className="space-y-6 max-w-7xl mx-auto">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Bem-vindo(a), Administrador!</h1>
-          <p className="text-sm text-white/60 mt-1">Acompanhe os principais indicadores da preceptoria com dados em tempo real.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Bem-vindo(a), Administrador!</h1>
+          <p className="text-sm text-slate-500 dark:text-white/60 mt-1">Acompanhe os principais indicadores da preceptoria com dados em tempo real.</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -145,7 +145,7 @@ function Dashboard() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="card-glow shadow-sm border-white/10 bg-white/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base text-white font-semibold">Atividades por Período</CardTitle>
+              <CardTitle className="text-base text-slate-900 dark:text-white font-semibold">Atividades por Período</CardTitle>
               <Select defaultValue="mes">
                 <SelectTrigger className="h-8 w-32.5 bg-white/10 border-white/20 text-white">
                   <SelectValue />
@@ -166,9 +166,9 @@ function Dashboard() {
                         <stop offset="100%" stopColor="#22c55e" stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                    <XAxis dataKey="semana" stroke="rgba(255,255,255,0.5)" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="rgba(255,255,255,0.5)" fontSize={11} tickLine={false} axisLine={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.2)" vertical={false} />
+                    <XAxis dataKey="semana" stroke="#64748B" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#64748B" fontSize={11} tickLine={false} axisLine={false} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: '#1F2937',
@@ -187,7 +187,7 @@ function Dashboard() {
           </Card>
 
           <Card className="card-glow shadow-sm border-white/10 bg-white/5">
-            <CardHeader className="pb-2"><CardTitle className="text-base text-white font-semibold">Carga Horária por Semestre</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base text-slate-900 dark:text-white font-semibold">Carga Horária por Semestre</CardTitle></CardHeader>
             <CardContent className="h-72">
               <div className="grid h-full grid-cols-2 items-center gap-4">
                 <ClientOnly>
@@ -209,17 +209,17 @@ function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                 </ClientOnly>
-                <div className="space-y-2 text-sm text-white/80">
+                <div className="space-y-2 text-sm text-slate-800 dark:text-slate-200">
                   {cargaPorSemestre.map((c) => (
                     <div key={c.name} className="flex items-center justify-between">
                       <span className="flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-full shadow-[0_0_8px_currentColor]" style={{ background: c.color, color: c.color }} />
                         {c.name}
                       </span>
-                      <span className="font-medium text-white">{c.value}h</span>
+                      <span className="font-medium text-slate-900 dark:text-white">{c.value}h</span>
                     </div>
                   ))}
-                  <div className="mt-3 border-t border-white/20 pt-2 text-right font-semibold text-[#4ade80]">
+                  <div className="mt-3 border-t border-slate-200 dark:border-white/20 pt-2 text-right font-semibold text-[#16a34a] dark:text-[#4ade80]">
                     Total: {totalCarga.toLocaleString("pt-BR")}h
                   </div>
                 </div>
@@ -230,22 +230,22 @@ function Dashboard() {
 
         <div className="grid gap-4 lg:grid-cols-2 pb-10">
           <Card className="card-glow shadow-sm border-white/10 bg-white/5">
-            <CardHeader className="pb-2"><CardTitle className="text-base text-white font-semibold">Atividades Recentes</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base text-slate-900 dark:text-white font-semibold">Atividades Recentes</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {loading ? (
-                <div className="text-white/50 text-sm py-4">Carregando atividades...</div>
+                <div className="text-slate-400 dark:text-white/50 text-sm py-4">Carregando atividades...</div>
               ) : atividadesRecentes.length === 0 ? (
-                <div className="text-white/50 text-sm py-4">Nenhuma atividade registrada ainda.</div>
+                <div className="text-slate-400 dark:text-white/50 text-sm py-4">Nenhuma atividade registrada ainda.</div>
               ) : (
                 atividadesRecentes.map((a) => (
-                  <div key={a.id} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition-colors">
+                  <div key={a.id} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-3 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
                     <div>
-                      <p className="text-sm font-medium text-white">{a.rotacoes?.nome || "Rotação não especificada"}</p>
-                      <p className="text-xs text-white/60">Preceptor: {a.preceptores?.nome || "N/A"}</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{a.rotacoes?.nome || "Rotação não especificada"}</p>
+                      <p className="text-xs text-slate-500 dark:text-white/60">Preceptor: {a.preceptores?.nome || "N/A"}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs text-white/50">Mês ref: {a.mes_referencia}</span>
-                      <span className="rounded-full bg-green-900/40 border border-green-500/30 px-2 py-0.5 text-[10px] font-medium text-[#4ade80]">
+                      <span className="text-xs text-slate-400 dark:text-white/50">Mês ref: {a.mes_referencia}</span>
+                      <span className="rounded-full bg-green-100 dark:bg-green-900/40 border border-green-400/40 dark:border-green-500/30 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:text-[#4ade80]">
                         {a.horas_realizadas}h concluídas
                       </span>
                     </div>
@@ -255,25 +255,25 @@ function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="card-glow shadow-sm border-white/10 bg-white/5">
+          <Card className="card-glow shadow-sm border-slate-200 dark:border-white/10 bg-white dark:bg-white/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base text-white font-semibold">Próximas Atividades</CardTitle>
-              <button className="text-xs font-medium text-[#4ade80] hover:text-[#22c55e] transition-colors hover:underline">Ver todas</button>
+              <CardTitle className="text-base text-slate-900 dark:text-white font-semibold">Próximas Atividades</CardTitle>
+              <button className="text-xs font-medium text-green-700 dark:text-[#4ade80] hover:text-green-800 dark:hover:text-[#22c55e] transition-colors hover:underline">Ver todas</button>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 p-3">
+              <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-3">
                 <div>
-                  <p className="text-sm font-medium text-white">Clínica Cirúrgica — Hospital Central</p>
-                  <p className="text-xs text-white/60">Preceptor: Dr. Paulo Mendes · Alunos: 10</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">Clínica Cirúrgica — Hospital Central</p>
+                  <p className="text-xs text-slate-500 dark:text-white/60">Preceptor: Dr. Paulo Mendes · Alunos: 10</p>
                 </div>
-                <span className="text-xs font-medium text-white/80">22/05</span>
+                <span className="text-xs font-medium text-slate-600 dark:text-white/80">22/05</span>
               </div>
-              <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 p-3">
+              <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-3">
                 <div>
-                  <p className="text-sm font-medium text-white">Medicina da Família — UBS Centro</p>
-                  <p className="text-xs text-white/60">Preceptor: Dra. Fernanda Lima · Alunos: 6</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">Medicina da Família — UBS Centro</p>
+                  <p className="text-xs text-slate-500 dark:text-white/60">Preceptor: Dra. Fernanda Lima · Alunos: 6</p>
                 </div>
-                <span className="text-xs font-medium text-white/80">23/05</span>
+                <span className="text-xs font-medium text-slate-600 dark:text-white/80">23/05</span>
               </div>
             </CardContent>
           </Card>
