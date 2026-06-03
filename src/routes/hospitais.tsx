@@ -1142,6 +1142,13 @@ function GerenciarUnidadeDialog({
           .delete()
           .in("preceptor_id", preceptorIdsOfLocal);
         if (deleteError) throw deleteError;
+
+        // Desvincular alunos cujo preceptor_id atual pertencia a esta unidade
+        const { error: unsetError } = await supabase
+          .from("alunos")
+          .update({ preceptor_id: null })
+          .in("preceptor_id", preceptorIdsOfLocal);
+        if (unsetError) throw unsetError;
       }
 
       // ── Criar vínculos operacionais com alunos selecionados ──
@@ -1187,6 +1194,22 @@ function GerenciarUnidadeDialog({
           .from("vinculo_operacional")
           .insert(vinculosToInsert);
         if (error) throw error;
+      }
+
+      // ── UPDATE alunos.preceptor_id para refletir a vinculação ──
+      for (const tag of selectedPreceptores) {
+        const key = tag.type === "existing" ? tag.id : tag.tempId;
+        const realPreceptorId = tag.type === "existing"
+          ? tag.id
+          : tempIdToRealId.get(tag.tempId);
+        if (!realPreceptorId) continue;
+        const selectedStudents = preceptorAlunos[key] ?? [];
+        if (selectedStudents.length === 0) continue;
+        const { error: updErr } = await supabase
+          .from("alunos")
+          .update({ preceptor_id: realPreceptorId })
+          .in("id", selectedStudents);
+        if (updErr) throw updErr;
       }
 
       // ── Desvincular preceptores removidos (apenas em edição) ──
