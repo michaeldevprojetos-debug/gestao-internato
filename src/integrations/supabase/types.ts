@@ -26,6 +26,7 @@ export type Database = {
           nome: string
           NOME: string | null
           PERIODO: string | null
+          preceptor_id: string | null
           semestre: number | null
           status: string | null
         }
@@ -40,6 +41,7 @@ export type Database = {
           nome: string
           NOME?: string | null
           PERIODO?: string | null
+          preceptor_id?: string | null
           semestre?: number | null
           status?: string | null
         }
@@ -54,10 +56,19 @@ export type Database = {
           nome?: string
           NOME?: string | null
           PERIODO?: string | null
+          preceptor_id?: string | null
           semestre?: number | null
           status?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "alunos_preceptor_id_fkey"
+            columns: ["preceptor_id"]
+            isOneToOne: false
+            referencedRelation: "preceptores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       locais: {
         Row: {
