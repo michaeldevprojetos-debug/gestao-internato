@@ -62,6 +62,7 @@ type LocalRow = {
     vinculoId: string | null;
   }>;
   alunosVinculados: Array<{
+    aluno_id: string;
     aluno_nome: string;
     aluno_semestre: number | null;
     preceptor_nome: string;
@@ -168,7 +169,7 @@ function HospitaisPage() {
         .select("id, preceptor_id, aluno_id, quantidade_alunos, alunos ( nome, semestre )");
       if (err3) throw err3;
 
-      type AlunoInfo = { nome: string; semestre: number | null };
+      type AlunoInfo = { id: string; nome: string; semestre: number | null };
       const preceptorAlunosSet  = new Map<string, Set<string>>();
       const preceptorStudents   = new Map<string, AlunoInfo[]>();
       const preceptorQtd = new Map<string, VinculoQtd>();
@@ -191,6 +192,7 @@ function HospitaisPage() {
           preceptorAlunosSet.get(v.preceptor_id)!.add(v.aluno_id);
           const al = v.alunos as { nome?: string; semestre?: number | null } | null;
           preceptorStudents.get(v.preceptor_id)!.push({
+            id:       v.aluno_id,
             nome:     al?.nome     ?? "—",
             semestre: al?.semestre ?? null,
           });
@@ -213,6 +215,7 @@ function HospitaisPage() {
           totalAlunosVinculados += qtd?.quantidade_alunos ?? 0;
           for (const s of preceptorStudents.get(p.id) ?? []) {
             alunosVinculados.push({
+              aluno_id:        s.id,
               aluno_nome:      s.nome,
               aluno_semestre:  s.semestre,
               preceptor_nome:  p.nome,
@@ -566,7 +569,6 @@ function HospitaisPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         local={editingLocal}
-        allPreceptores={allPreceptores}
         allLocaisSimple={allLocaisSimple}
         allAlunos={allAlunos}
         onSaved={() => {
@@ -888,7 +890,7 @@ function AlunoMultiSelect({
 
 // ─── Modal: Gerenciar Unidade (Formulário Inteligente) ────────────────────────
 
-type TagPreceptor = {
+type SelectedPreceptor = {
   type: "existing";
   id: string;
   nome: string;
@@ -899,12 +901,11 @@ type TagPreceptor = {
 };
 
 function GerenciarUnidadeDialog({
-  open, onOpenChange, local, allPreceptores, allLocaisSimple, allAlunos, onSaved,
+  open, onOpenChange, local, allLocaisSimple, allAlunos, onSaved,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   local: LocalRow | null;
-  allPreceptores: PreceptorSimple[];
   allLocaisSimple: LocalSimple[];
   allAlunos: AlunoSimple[];
   onSaved: () => void;
@@ -915,11 +916,31 @@ function GerenciarUnidadeDialog({
   const [tipo,              setTipo]            = useState<string>("Outro");
   const [especialidade,     setEspecialidade]   = useState<string>("");
   const [especialidadeCustom, setEspecialidadeCustom] = useState("");
-  const [selectedTags,      setSelectedTags]    = useState<TagPreceptor[]>([]);
+  const [selectedPreceptores, setSelectedPreceptores] = useState<SelectedPreceptor[]>([]);
   const [preceptorSearch,   setPreceptorSearch] = useState("");
   const [saving,            setSaving]          = useState(false);
+  const [preceptoresOptions, setPreceptoresOptions] = useState<PreceptorSimple[]>([]);
   // Per-preceptor student selections: Map<preceptorKey, string[]>
   const [preceptorAlunos,   setPreceptorAlunos] = useState<Record<string, string[]>>({});
+
+  // Carregar preceptores diretamente no modal ao abrir
+  useEffect(() => {
+    if (!open) return;
+    const fetchPreceptores = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("preceptores")
+          .select("id, nome, especialidade, local_id")
+          .order("nome");
+        if (error) throw error;
+        setPreceptoresOptions((data ?? []) as PreceptorSimple[]);
+      } catch (err: any) {
+        console.error("Erro ao carregar preceptores no modal:", err);
+        toast.error("Erro ao carregar lista de preceptores.");
+      }
+    };
+    fetchPreceptores();
+  }, [open]);
 
   // Popula o formulário ao abrir
   useEffect(() => {
@@ -928,30 +949,25 @@ function GerenciarUnidadeDialog({
     setTipo(local?.tipo ?? "Outro");
     setEspecialidade("");
     setEspecialidadeCustom("");
-    setSelectedTags(
+    setSelectedPreceptores(
       local?.preceptoresList.map(p => ({ type: "existing" as const, id: p.id, nome: p.nome })) ?? []
     );
     setPreceptorSearch("");
-    // Initialize per-preceptor aluno selections from existing data
+    // Initialize per-preceptor aluno selections from existing data using Direct ID mapping
     const initialAlunos: Record<string, string[]> = {};
     if (local) {
       for (const p of local.preceptoresList) {
         const studentIds = local.alunosVinculados
           .filter(a => a.preceptor_id === p.id)
-          .map(a => {
-            // Find the actual aluno id by name
-            const found = allAlunos.find(al => al.nome === a.aluno_nome);
-            return found?.id;
-          })
-          .filter(Boolean) as string[];
+          .map(a => a.aluno_id);
         if (studentIds.length > 0) initialAlunos[p.id] = studentIds;
       }
     }
     setPreceptorAlunos(initialAlunos);
-  }, [open, local, allAlunos]);
+  }, [open, local]);
 
   const toggleExisting = (p: PreceptorSimple) => {
-    setSelectedTags(prev => {
+    setSelectedPreceptores(prev => {
       const exists = prev.find(t => t.type === "existing" && t.id === p.id);
       if (exists) {
         // Remove from tags and clear aluno selections
@@ -966,14 +982,14 @@ function GerenciarUnidadeDialog({
     });
   };
 
-  const removeTag = (tag: TagPreceptor) => {
+  const removePreceptor = (tag: SelectedPreceptor) => {
     const key = tag.type === "existing" ? tag.id : tag.tempId;
     setPreceptorAlunos(pa => {
       const copy = { ...pa };
       delete copy[key];
       return copy;
     });
-    setSelectedTags(prev => {
+    setSelectedPreceptores(prev => {
       if (tag.type === "existing") return prev.filter(t => !(t.type === "existing" && t.id === tag.id));
       return prev.filter(t => !(t.type === "new" && t.tempId === tag.tempId));
     });
@@ -984,23 +1000,23 @@ function GerenciarUnidadeDialog({
     e.preventDefault();
     const searchLower = preceptorSearch.trim().toLowerCase();
 
-    const matchingExisting = allPreceptores.find(p => p.nome.toLowerCase() === searchLower);
+    const matchingExisting = preceptoresOptions.find(p => p.nome.toLowerCase() === searchLower);
     if (matchingExisting) {
-      const alreadySelected = selectedTags.find(t => t.type === "existing" && t.id === matchingExisting.id);
+      const alreadySelected = selectedPreceptores.find(t => t.type === "existing" && t.id === matchingExisting.id);
       if (!alreadySelected) {
-        setSelectedTags(prev => [...prev, { type: "existing", id: matchingExisting.id, nome: matchingExisting.nome }]);
+        setSelectedPreceptores(prev => [...prev, { type: "existing", id: matchingExisting.id, nome: matchingExisting.nome }]);
       }
       setPreceptorSearch("");
       return;
     }
 
-    const alreadyNew = selectedTags.find(t => t.type === "new" && t.nome.toLowerCase() === searchLower);
+    const alreadyNew = selectedPreceptores.find(t => t.type === "new" && t.nome.toLowerCase() === searchLower);
     if (alreadyNew) {
       setPreceptorSearch("");
       return;
     }
 
-    setSelectedTags(prev => [...prev, {
+    setSelectedPreceptores(prev => [...prev, {
       type: "new",
       nome: preceptorSearch.trim(),
       tempId: crypto.randomUUID(),
@@ -1008,11 +1024,11 @@ function GerenciarUnidadeDialog({
     setPreceptorSearch("");
   };
 
-  const visiblePreceptores = allPreceptores.filter(p =>
+  const visiblePreceptores = preceptoresOptions.filter(p =>
     p.nome.toLowerCase().includes(preceptorSearch.toLowerCase())
   );
 
-  const isSelected = (id: string) => selectedTags.some(t => t.type === "existing" && t.id === id);
+  const isSelected = (id: string) => selectedPreceptores.some(t => t.type === "existing" && t.id === id);
 
   // Compute total alunos across all preceptors
   const totalAlunosSelecionados = Object.values(preceptorAlunos).reduce((sum, ids) => sum + ids.length, 0);
@@ -1075,7 +1091,7 @@ function GerenciarUnidadeDialog({
       }
 
       // ── Criar preceptores temporários (tags novas) ──
-      const newTags = selectedTags.filter(t => t.type === "new");
+      const newTags = selectedPreceptores.filter(t => t.type === "new");
       const tempIdToRealId = new Map<string, string>();
 
       for (const tag of newTags) {
@@ -1095,7 +1111,7 @@ function GerenciarUnidadeDialog({
       }
 
       // ── Vincular preceptores existentes selecionados ──
-      const existingIds = selectedTags
+      const existingIds = selectedPreceptores
         .filter(t => t.type === "existing")
         .map(t => (t as { type: "existing"; id: string }).id);
 
@@ -1118,15 +1134,25 @@ function GerenciarUnidadeDialog({
         }
       }
 
+      // ── Limpar vínculos operacionais antigos (evita duplicações) ──
+      if (local && local.preceptoresList.length > 0) {
+        const preceptorIdsOfLocal = local.preceptoresList.map(p => p.id);
+        const { error: deleteError } = await supabase
+          .from("vinculo_operacional")
+          .delete()
+          .in("preceptor_id", preceptorIdsOfLocal);
+        if (deleteError) throw deleteError;
+      }
+
       // ── Criar vínculos operacionais com alunos selecionados ──
       const vinculosToInsert: Array<{
         preceptor_id: string;
-        aluno_id: string;
+        aluno_id: string | null;
         quantidade_alunos: number;
         mes_referencia: string;
       }> = [];
 
-      for (const tag of selectedTags) {
+      for (const tag of selectedPreceptores) {
         const key = tag.type === "existing" ? tag.id : tag.tempId;
         const realPreceptorId = tag.type === "existing"
           ? tag.id
@@ -1145,11 +1171,11 @@ function GerenciarUnidadeDialog({
               mes_referencia: new Date().toISOString().slice(0, 7),
             });
           }
-        } else if (qtd === 0) {
+        } else {
           // Criar vínculo sem aluno mas com quantidade 0
           vinculosToInsert.push({
             preceptor_id: realPreceptorId,
-            aluno_id: null as any,
+            aluno_id: null,
             quantidade_alunos: 0,
             mes_referencia: new Date().toISOString().slice(0, 7),
           });
@@ -1230,34 +1256,9 @@ function GerenciarUnidadeDialog({
               <Users className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-semibold">Alocar Preceptores</p>
               <Badge variant="secondary" className="ml-auto text-xs">
-                {selectedTags.length} selecionado{selectedTags.length !== 1 ? "s" : ""}
+                {selectedPreceptores.length} selecionado{selectedPreceptores.length !== 1 ? "s" : ""}
               </Badge>
             </div>
-
-            {/* Tags dos selecionados */}
-            {selectedTags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-3 p-2 rounded-md border border-border/50 bg-muted/20">
-                {selectedTags.map(tag => (
-                  <Badge
-                    key={tag.type === "existing" ? tag.id : tag.tempId}
-                    variant={tag.type === "existing" ? "secondary" : "default"}
-                    className="pl-2 pr-1 py-1 gap-1 text-xs cursor-default"
-                  >
-                    {tag.nome}
-                    {tag.type === "new" && (
-                      <span className="text-[9px] opacity-70 ml-0.5">(novo)</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="ml-0.5 rounded-full p-0.5 hover:bg-foreground/10 transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
 
             <div className="relative mb-2">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1319,7 +1320,7 @@ function GerenciarUnidadeDialog({
               )}
             </div>
 
-            {allPreceptores.length === 0 && !preceptorSearch && (
+            {preceptoresOptions.length === 0 && !preceptorSearch && (
               <p className="text-xs text-muted-foreground mt-2 text-center">
                 Nenhum preceptor cadastrado no sistema.
               </p>
@@ -1349,21 +1350,20 @@ function GerenciarUnidadeDialog({
             )}
           </div>
 
-          {/* ── Vinculação de Alunos por Preceptor ── */}
-          {selectedTags.length > 0 && (
-            <div className="space-y-4">
+          {/* ── Lista de preceptores alocados e suas vinculações de alunos ── */}
+          {selectedPreceptores.length > 0 && (
+            <div className="space-y-3 mt-2 pt-2 border-t">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm font-semibold">Quantidade de alunos por preceptor(a)</p>
-                </div>
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Preceptores Selecionados e Alocação de Alunos
+                </Label>
                 <Badge variant="outline" className="text-xs font-bold">
                   Total: {totalAlunosSelecionados} aluno(s)
                 </Badge>
               </div>
 
               <div className="space-y-3">
-                {selectedTags.map(tag => {
+                {selectedPreceptores.map(tag => {
                   const key = tag.type === "existing" ? tag.id : tag.tempId;
                   const alunoIds = preceptorAlunos[key] ?? [];
 
@@ -1372,33 +1372,52 @@ function GerenciarUnidadeDialog({
                       key={key}
                       className="rounded-lg border border-border/60 bg-muted/10 p-3"
                     >
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Users className="h-3.5 w-3.5 text-primary" />
+                          <Users className="h-4 w-4 text-primary" />
                           <span className="text-sm font-semibold">{tag.nome}</span>
                           {tag.type === "new" && (
                             <Badge variant="default" className="text-[9px] py-0 px-1.5">(novo)</Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                            Qtd. alunos:
-                          </span>
-                          <Badge
-                            variant={alunoIds.length > 0 ? "secondary" : "outline"}
-                            className="font-bold text-xs min-w-[28px] justify-center"
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                              Alunos vinculados:
+                            </span>
+                            <Badge
+                              variant={alunoIds.length > 0 ? "secondary" : "outline"}
+                              className="font-bold text-xs min-w-[24px] h-5 justify-center"
+                            >
+                              {alunoIds.length}
+                            </Badge>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removePreceptor(tag)}
+                            className="rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                            title="Remover preceptor"
                           >
-                            {alunoIds.length}
-                          </Badge>
+                            <X className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
 
-                      <AlunoMultiSelect
-                        allAlunos={allAlunos}
-                        selectedAlunoIds={alunoIds}
-                        onChangeAlunoIds={(ids) => updatePreceptorAlunos(key, ids)}
-                        preceptorNome={tag.nome}
-                      />
+                      {/* Rótulo e Componente de Alunos */}
+                      <div className="mt-2 pt-2 border-t border-border/40">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Quantidade de alunos por preceptor(a)
+                          </span>
+                        </div>
+                        <AlunoMultiSelect
+                          allAlunos={allAlunos}
+                          selectedAlunoIds={alunoIds}
+                          onChangeAlunoIds={(ids) => updatePreceptorAlunos(key, ids)}
+                          preceptorNome={tag.nome}
+                        />
+                      </div>
                     </div>
                   );
                 })}
