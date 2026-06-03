@@ -70,7 +70,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           nome: string
-          tipo?: string
+          tipo: string
         }
         Update: {
           created_at?: string | null
@@ -209,7 +209,7 @@ export type Database = {
           id: string
           mes_referencia: string
           preceptor_id: string | null
-          quantidade_alunos: number
+          quantidade_alunos: number | null
           rotacao_id: string | null
           valor_hora_preceptor: number | null
         }
@@ -222,7 +222,7 @@ export type Database = {
           id?: string
           mes_referencia: string
           preceptor_id?: string | null
-          quantidade_alunos?: number
+          quantidade_alunos?: number | null
           rotacao_id?: string | null
           valor_hora_preceptor?: number | null
         }
@@ -235,7 +235,7 @@ export type Database = {
           id?: string
           mes_referencia?: string
           preceptor_id?: string | null
-          quantidade_alunos?: number
+          quantidade_alunos?: number | null
           rotacao_id?: string | null
           valor_hora_preceptor?: number | null
         }
