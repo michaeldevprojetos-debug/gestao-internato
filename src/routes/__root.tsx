@@ -86,16 +86,33 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Painel de Preceptoria — Gestão do Internato" },
-      { name: "description", content: "Painel administrativo de gestão de preceptoria e custo real do internato." },
+      {
+        name: "description",
+        content: "Painel administrativo de gestão de preceptoria e custo real do internato.",
+      },
       { property: "og:title", content: "Painel de Preceptoria — Gestão do Internato" },
-      { property: "og:description", content: "Painel administrativo de gestão de preceptoria e custo real do internato." },
+      {
+        property: "og:description",
+        content: "Painel administrativo de gestão de preceptoria e custo real do internato.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Painel de Preceptoria — Gestão do Internato" },
-      { name: "twitter:description", content: "Painel administrativo de gestão de preceptoria e custo real do internato." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/be227320-fd60-471a-b899-1bb196aa4f84" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/be227320-fd60-471a-b899-1bb196aa4f84" },
+      {
+        name: "twitter:description",
+        content: "Painel administrativo de gestão de preceptoria e custo real do internato.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/be227320-fd60-471a-b899-1bb196aa4f84",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/be227320-fd60-471a-b899-1bb196aa4f84",
+      },
     ],
     links: [
       {
@@ -196,7 +213,8 @@ function AppShell() {
                 </span>
               </div>
               <Button variant="ghost" size="sm" onClick={logout}>
-                <LogOut className="mr-1 h-4 w-4" />Sair
+                <LogOut className="mr-1 h-4 w-4" />
+                Sair
               </Button>
             </div>
           </header>

@@ -92,10 +92,7 @@ function UsuariosPage() {
     if (!confirmado) return;
 
     try {
-      const { error } = await supabase
-        .from("usuarios_painel")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("usuarios_painel").delete().eq("id", id);
 
       if (error) throw error;
 
@@ -242,7 +239,7 @@ function UsuarioDialog({
   const [nome, setNome] = useState(data?.nome ?? "");
   const [email, setEmail] = useState(data?.email ?? "");
   const [nivel, setNivel] = useState<"Admin" | "Visualizador">(
-    data?.nivel_acesso ?? "Visualizador"
+    data?.nivel_acesso ?? "Visualizador",
   );
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(open ?? false);
@@ -291,8 +288,8 @@ function UsuarioDialog({
         // 1. Criar conta no Supabase Auth com senha provisória
         const authData = await supabase.auth.signUp({
           email: payload.email,
-          password: 'Afya@2026',
-          options: { data: { trocar_senha: true, nome: payload.nome } }
+          password: "Afya@2026",
+          options: { data: { trocar_senha: true, nome: payload.nome } },
         });
 
         if (authData.error) throw authData.error;
@@ -365,10 +362,7 @@ function UsuarioDialog({
 
             <div className="grid gap-2">
               <Label htmlFor="usuario-nivel">Nível de Acesso</Label>
-              <Select
-                value={nivel}
-                onValueChange={(v) => setNivel(v as "Admin" | "Visualizador")}
-              >
+              <Select value={nivel} onValueChange={(v) => setNivel(v as "Admin" | "Visualizador")}>
                 <SelectTrigger id="usuario-nivel">
                   <SelectValue />
                 </SelectTrigger>

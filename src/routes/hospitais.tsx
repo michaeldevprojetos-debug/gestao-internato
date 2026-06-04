@@ -2,19 +2,56 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
-  Plus, Pencil, Building2, AlertCircle, Search,
-  ChevronRight, ChevronDown, Settings2, Users, Trash2, X,
-  ChevronsUpDown, Check, GraduationCap,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Plus,
+  Pencil,
+  Building2,
+  AlertCircle,
+  Search,
+  ChevronRight,
+  ChevronDown,
+  Settings2,
+  Users,
+  Trash2,
+  X,
+  ChevronsUpDown,
+  Check,
+  GraduationCap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -94,13 +131,13 @@ const ESPECIALIDADES_COMUNS = [
 ] as const;
 
 const BADGE_COLOR: Record<string, string> = {
-  Hospital:    "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  UPA:         "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
-  CAPS:        "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  Hospital: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  UPA: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  CAPS: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
   Maternidade: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300",
-  Clínica:     "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-  UBS:         "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
-  Outro:       "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  Clínica: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  UBS: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+  Outro: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
 export const Route = createFileRoute("/hospitais")({
@@ -111,21 +148,20 @@ export const Route = createFileRoute("/hospitais")({
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 function HospitaisPage() {
-  const [locais, setLocais]           = useState<LocalRow[]>([]);
-  const [filtered, setFiltered]       = useState<LocalRow[]>([]);
+  const [locais, setLocais] = useState<LocalRow[]>([]);
+  const [filtered, setFiltered] = useState<LocalRow[]>([]);
   const [allPreceptores, setAllPreceptores] = useState<PreceptorSimple[]>([]);
   const [allLocaisSimple, setAllLocaisSimple] = useState<LocalSimple[]>([]);
-  const [allAlunos, setAllAlunos]     = useState<AlunoSimple[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState<string | null>(null);
-  const [query, setQuery]             = useState("");
+  const [allAlunos, setAllAlunos] = useState<AlunoSimple[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [limiteAlunos, setLimiteAlunos] = useState(4);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-  const [dialogOpen, setDialogOpen]   = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLocal, setEditingLocal] = useState<LocalRow | null>(null);
 
-  const toggleRow = (id: string) =>
-    setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleRow = (id: string) => setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
 
   // ── Busca e agrega dados ───────────────────────────────────────────────────
   const fetchLocais = useCallback(async () => {
@@ -157,11 +193,13 @@ function HospitaisPage() {
         .order("nome");
       if (errAlunos) throw errAlunos;
 
-      setAllAlunos((alunosData ?? []).map(a => ({
-        id: a.id,
-        nome: a.nome,
-        semestre: a.semestre,
-      })));
+      setAllAlunos(
+        (alunosData ?? []).map((a) => ({
+          id: a.id,
+          nome: a.nome,
+          semestre: a.semestre,
+        })),
+      );
 
       // 4. Vínculos operacionais
       const { data: vinculosData, error: err3 } = await supabase
@@ -170,8 +208,8 @@ function HospitaisPage() {
       if (err3) throw err3;
 
       type AlunoInfo = { id: string; nome: string; semestre: number | null };
-      const preceptorAlunosSet  = new Map<string, Set<string>>();
-      const preceptorStudents   = new Map<string, AlunoInfo[]>();
+      const preceptorAlunosSet = new Map<string, Set<string>>();
+      const preceptorStudents = new Map<string, AlunoInfo[]>();
       const preceptorQtd = new Map<string, VinculoQtd>();
 
       for (const v of vinculosData ?? []) {
@@ -192,16 +230,18 @@ function HospitaisPage() {
           preceptorAlunosSet.get(v.preceptor_id)!.add(v.aluno_id);
           const al = v.alunos as { nome?: string; semestre?: number | null } | null;
           preceptorStudents.get(v.preceptor_id)!.push({
-            id:       v.aluno_id,
-            nome:     al?.nome     ?? "—",
+            id: v.aluno_id,
+            nome: al?.nome ?? "—",
             semestre: al?.semestre ?? null,
           });
         }
       }
 
-      const rows: LocalRow[] = (locaisData ?? []).map(local => {
-        const unitPreceptors  = (preceptoresData ?? []).filter(p => p.local_id === local.id);
-        const activePreceptors = unitPreceptors.filter(p => (preceptorAlunosSet.get(p.id)?.size ?? 0) > 0);
+      const rows: LocalRow[] = (locaisData ?? []).map((local) => {
+        const unitPreceptors = (preceptoresData ?? []).filter((p) => p.local_id === local.id);
+        const activePreceptors = unitPreceptors.filter(
+          (p) => (preceptorAlunosSet.get(p.id)?.size ?? 0) > 0,
+        );
 
         const specs = new Set<string>();
         for (const p of activePreceptors) {
@@ -215,28 +255,28 @@ function HospitaisPage() {
           totalAlunosVinculados += qtd?.quantidade_alunos ?? 0;
           for (const s of preceptorStudents.get(p.id) ?? []) {
             alunosVinculados.push({
-              aluno_id:        s.id,
-              aluno_nome:      s.nome,
-              aluno_semestre:  s.semestre,
-              preceptor_nome:  p.nome,
-              preceptor_id:    p.id,
+              aluno_id: s.id,
+              aluno_nome: s.nome,
+              aluno_semestre: s.semestre,
+              preceptor_nome: p.nome,
+              preceptor_id: p.id,
             });
           }
         }
 
         return {
-          id:               local.id,
-          nome:             local.nome,
-          tipo:             local.tipo,
+          id: local.id,
+          nome: local.nome,
+          tipo: local.tipo,
           totalPreceptores: activePreceptors.length,
-          especialidades:   Array.from(specs).sort(),
-          preceptoresList:  unitPreceptors.map(p => ({
-            id:             p.id,
-            nome:           p.nome,
-            especialidade:  p.especialidade,
-            alunosCount:    preceptorAlunosSet.get(p.id)?.size ?? 0,
+          especialidades: Array.from(specs).sort(),
+          preceptoresList: unitPreceptors.map((p) => ({
+            id: p.id,
+            nome: p.nome,
+            especialidade: p.especialidade,
+            alunosCount: preceptorAlunosSet.get(p.id)?.size ?? 0,
             quantidadeAlunos: preceptorQtd.get(p.id)?.quantidade_alunos ?? 0,
-            vinculoId:      preceptorQtd.get(p.id)?.id ?? null,
+            vinculoId: preceptorQtd.get(p.id)?.id ?? null,
           })),
           alunosVinculados,
           totalAlunosVinculados,
@@ -252,18 +292,25 @@ function HospitaisPage() {
     }
   }, []);
 
-  useEffect(() => { fetchLocais(); }, [fetchLocais]);
+  useEffect(() => {
+    fetchLocais();
+  }, [fetchLocais]);
 
   useEffect(() => {
     const q = query.trim().toLowerCase();
-    setFiltered(q ? locais.filter(l => l.nome.toLowerCase().includes(q)) : locais);
+    setFiltered(q ? locais.filter((l) => l.nome.toLowerCase().includes(q)) : locais);
   }, [query, locais]);
 
-  const countByTipo = (tipo: string) => locais.filter(l => l.tipo === tipo).length;
+  const countByTipo = (tipo: string) => locais.filter((l) => l.tipo === tipo).length;
 
   // ── Excluir unidade ──
   async function handleDeleteLocal(localId: string, localNome: string) {
-    if (!window.confirm(`Tem certeza que deseja excluir a unidade "${localNome}"?\n\nOs preceptores associados serão desvinculados.`)) return;
+    if (
+      !window.confirm(
+        `Tem certeza que deseja excluir a unidade "${localNome}"?\n\nOs preceptores associados serão desvinculados.`,
+      )
+    )
+      return;
     try {
       const { error: err1 } = await supabase
         .from("preceptores")
@@ -271,10 +318,7 @@ function HospitaisPage() {
         .eq("local_id", localId);
       if (err1) throw err1;
 
-      const { error: err2 } = await supabase
-        .from("locais")
-        .delete()
-        .eq("id", localId);
+      const { error: err2 } = await supabase.from("locais").delete().eq("id", localId);
       if (err2) throw err2;
 
       toast.success(`Unidade "${localNome}" excluída com sucesso!`);
@@ -285,7 +329,11 @@ function HospitaisPage() {
   }
 
   // ── Atualizar quantidade_alunos em tempo real ──
-  async function handleUpdateQuantidade(vinculoId: string | null, preceptorId: string, newValue: number) {
+  async function handleUpdateQuantidade(
+    vinculoId: string | null,
+    preceptorId: string,
+    newValue: number,
+  ) {
     try {
       if (vinculoId) {
         const { error } = await supabase
@@ -294,24 +342,25 @@ function HospitaisPage() {
           .eq("id", vinculoId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("vinculo_operacional")
-          .insert({
-            preceptor_id: preceptorId,
-            quantidade_alunos: newValue,
-            mes_referencia: new Date().toISOString().slice(0, 7),
-          });
+        const { error } = await supabase.from("vinculo_operacional").insert({
+          preceptor_id: preceptorId,
+          quantidade_alunos: newValue,
+          mes_referencia: new Date().toISOString().slice(0, 7),
+        });
         if (error) throw error;
       }
-      setLocais(prev => prev.map(l => ({
-        ...l,
-        preceptoresList: l.preceptoresList.map(p =>
-          p.id === preceptorId ? { ...p, quantidadeAlunos: newValue } : p
-        ),
-        totalAlunosVinculados: l.preceptoresList.reduce((sum, p) =>
-          sum + (p.id === preceptorId ? newValue : p.quantidadeAlunos), 0
-        ),
-      })));
+      setLocais((prev) =>
+        prev.map((l) => ({
+          ...l,
+          preceptoresList: l.preceptoresList.map((p) =>
+            p.id === preceptorId ? { ...p, quantidadeAlunos: newValue } : p,
+          ),
+          totalAlunosVinculados: l.preceptoresList.reduce(
+            (sum, p) => sum + (p.id === preceptorId ? newValue : p.quantidadeAlunos),
+            0,
+          ),
+        })),
+      );
     } catch (e: any) {
       toast.error("Erro ao salvar quantidade: " + (e?.message ?? ""));
     }
@@ -330,15 +379,21 @@ function HospitaisPage() {
             )}
           </p>
         </div>
-        <Button onClick={() => { setEditingLocal(null); setDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />Nova Unidade
+        <Button
+          onClick={() => {
+            setEditingLocal(null);
+            setDialogOpen(true);
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Nova Unidade
         </Button>
       </div>
 
       {/* ── Cards de contagem ── */}
       {!loading && !error && (
         <div className="grid gap-4 sm:grid-cols-3">
-          {(["Hospital", "UPA", "Maternidade"] as const).map(tipo => (
+          {(["Hospital", "UPA", "Maternidade"] as const).map((tipo) => (
             <Card key={tipo} className="border-border/60">
               <CardContent className="flex items-center gap-4 p-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -375,11 +430,14 @@ function HospitaisPage() {
                 placeholder="Buscar unidade…"
                 className="pl-8"
                 value={query}
-                onChange={e => setQuery(e.target.value)}
+                onChange={(e) => setQuery(e.target.value)}
               />
             </div>
             <div className="flex items-center gap-2 bg-muted/40 px-3 py-1.5 rounded-lg border border-border/50">
-              <Label htmlFor="limite-input" className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+              <Label
+                htmlFor="limite-input"
+                className="text-xs font-semibold text-muted-foreground whitespace-nowrap"
+              >
                 Limite de Alunos / Preceptor:
               </Label>
               <Input
@@ -387,7 +445,7 @@ function HospitaisPage() {
                 type="number"
                 min={1}
                 value={limiteAlunos}
-                onChange={e => setLimiteAlunos(Math.max(1, Number(e.target.value)))}
+                onChange={(e) => setLimiteAlunos(Math.max(1, Number(e.target.value)))}
                 className="w-16 h-8 text-center font-bold"
               />
             </div>
@@ -407,157 +465,183 @@ function HospitaisPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading
-                  ? Array.from({ length: 8 }).map((_, i) => (
-                      <TableRow key={i}>
-                        {Array.from({ length: 7 }).map((__, j) => (
-                          <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  : filtered.length === 0
-                    ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
-                          {error
-                            ? "Erro ao carregar. Verifique se a migration SQL foi executada."
-                            : "Nenhuma unidade encontrada."}
+                {loading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 7 }).map((__, j) => (
+                        <TableCell key={j}>
+                          <Skeleton className="h-4 w-full" />
                         </TableCell>
-                      </TableRow>
-                    )
-                    : filtered.map(u => {
-                        const isExpanded    = !!expandedRows[u.id];
-                        const hasLimitWarn  = u.preceptoresList.some(p => p.alunosCount > limiteAlunos);
+                      ))}
+                    </TableRow>
+                  ))
+                ) : filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                      {error
+                        ? "Erro ao carregar. Verifique se a migration SQL foi executada."
+                        : "Nenhuma unidade encontrada."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((u) => {
+                    const isExpanded = !!expandedRows[u.id];
+                    const hasLimitWarn = u.preceptoresList.some(
+                      (p) => p.alunosCount > limiteAlunos,
+                    );
 
-                        return (
-                          <Fragment key={u.id}>
-                            <TableRow
-                              className="hover:bg-muted/50 cursor-pointer transition-colors"
-                              onClick={() => toggleRow(u.id)}
+                    return (
+                      <Fragment key={u.id}>
+                        <TableRow
+                          className="hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => toggleRow(u.id)}
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground shrink-0">
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </span>
+                              <span>{u.nome}</span>
+                              {hasLimitWarn && (
+                                <Badge
+                                  variant="destructive"
+                                  className="text-[10px] h-5 py-0 px-2 animate-pulse shrink-0 ml-1"
+                                >
+                                  Limitação de Espaço Unidade
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+
+                          <TableCell>
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${BADGE_COLOR[u.tipo] ?? BADGE_COLOR["Outro"]}`}
                             >
-                              <TableCell className="font-medium">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground shrink-0">
-                                    {isExpanded
-                                      ? <ChevronDown className="h-4 w-4" />
-                                      : <ChevronRight className="h-4 w-4" />}
-                                  </span>
-                                  <span>{u.nome}</span>
-                                  {hasLimitWarn && (
-                                    <Badge variant="destructive" className="text-[10px] h-5 py-0 px-2 animate-pulse shrink-0 ml-1">
-                                      Limitação de Espaço Unidade
+                              {u.tipo}
+                            </span>
+                          </TableCell>
+
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {u.especialidades.length === 0 ? (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              ) : (
+                                <>
+                                  {u.especialidades.slice(0, 3).map((e) => (
+                                    <Badge key={e} variant="secondary" className="text-[10px]">
+                                      {e}
+                                    </Badge>
+                                  ))}
+                                  {u.especialidades.length > 3 && (
+                                    <Badge variant="outline" className="text-[10px]">
+                                      +{u.especialidades.length - 3}
                                     </Badge>
                                   )}
-                                </div>
-                              </TableCell>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
 
-                              <TableCell>
-                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${BADGE_COLOR[u.tipo] ?? BADGE_COLOR["Outro"]}`}>
-                                  {u.tipo}
-                                </span>
-                              </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {u.totalPreceptores}
+                          </TableCell>
 
-                              <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {u.especialidades.length === 0 ? (
-                                    <span className="text-xs text-muted-foreground">—</span>
-                                  ) : (
-                                    <>
-                                      {u.especialidades.slice(0, 3).map(e => (
-                                        <Badge key={e} variant="secondary" className="text-[10px]">{e}</Badge>
-                                      ))}
-                                      {u.especialidades.length > 3 && (
-                                        <Badge variant="outline" className="text-[10px]">+{u.especialidades.length - 3}</Badge>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              </TableCell>
+                          <TableCell className="text-right">
+                            <Badge
+                              variant={u.totalAlunosVinculados > 0 ? "secondary" : "outline"}
+                              className="text-xs font-semibold"
+                            >
+                              {u.totalAlunosVinculados}
+                            </Badge>
+                          </TableCell>
 
-                              <TableCell className="text-right font-semibold">{u.totalPreceptores}</TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-xs text-muted-foreground font-medium">
+                              {limiteAlunos} / preceptor
+                            </span>
+                          </TableCell>
 
-                              <TableCell className="text-right">
-                                <Badge
-                                  variant={u.totalAlunosVinculados > 0 ? "secondary" : "outline"}
-                                  className="text-xs font-semibold"
-                                >
-                                  {u.totalAlunosVinculados}
-                                </Badge>
-                              </TableCell>
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Gerenciar Unidade"
+                                onClick={() => {
+                                  setEditingLocal(u);
+                                  setDialogOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Excluir Unidade"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDeleteLocal(u.id, u.nome)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
 
-                              <TableCell className="text-right">
-                                <span className="text-xs text-muted-foreground font-medium">
-                                  {limiteAlunos} / preceptor
-                                </span>
-                              </TableCell>
+                        {/* ── Sub-linha expansível (Accordion) ── */}
+                        {isExpanded && (
+                          <TableRow className="bg-muted/5 hover:bg-muted/5">
+                            <TableCell colSpan={7} className="p-4 pt-1">
+                              <div className="rounded-lg border bg-card/50 p-4 shadow-inner">
+                                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
+                                  Distribuição de Preceptores e Alunos
+                                </h4>
 
-                              <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                                <div className="flex items-center justify-end gap-1">
-                                  <Button
-                                    variant="ghost" size="icon"
-                                    title="Gerenciar Unidade"
-                                    onClick={() => { setEditingLocal(u); setDialogOpen(true); }}
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost" size="icon"
-                                    title="Excluir Unidade"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => handleDeleteLocal(u.id, u.nome)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
+                                {u.preceptoresList.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground py-2">
+                                    Nenhum preceptor alocado.{" "}
+                                    <button
+                                      className="text-primary underline hover:no-underline text-sm"
+                                      onClick={() => {
+                                        setEditingLocal(u);
+                                        setDialogOpen(true);
+                                      }}
+                                    >
+                                      Clique aqui para gerenciar.
+                                    </button>
+                                  </p>
+                                ) : (
+                                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    {u.preceptoresList.map((p) => {
+                                      const exceeded = p.alunosCount > limiteAlunos;
+                                      const students = u.alunosVinculados.filter(
+                                        (a) => a.preceptor_id === p.id,
+                                      );
 
-                            {/* ── Sub-linha expansível (Accordion) ── */}
-                            {isExpanded && (
-                              <TableRow className="bg-muted/5 hover:bg-muted/5">
-                                <TableCell colSpan={7} className="p-4 pt-1">
-                                  <div className="rounded-lg border bg-card/50 p-4 shadow-inner">
-                                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
-                                      Distribuição de Preceptores e Alunos
-                                    </h4>
-
-                                    {u.preceptoresList.length === 0 ? (
-                                      <p className="text-sm text-muted-foreground py-2">
-                                        Nenhum preceptor alocado.{" "}
-                                        <button
-                                          className="text-primary underline hover:no-underline text-sm"
-                                          onClick={() => { setEditingLocal(u); setDialogOpen(true); }}
-                                        >
-                                          Clique aqui para gerenciar.
-                                        </button>
-                                      </p>
-                                    ) : (
-                                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                        {u.preceptoresList.map(p => {
-                                          const exceeded  = p.alunosCount > limiteAlunos;
-                                          const students  = u.alunosVinculados.filter(a => a.preceptor_id === p.id);
-
-                                          return (
-                                            <PreceptorCard
-                                              key={p.id}
-                                              preceptor={p}
-                                              students={students}
-                                              exceeded={exceeded}
-                                              limiteAlunos={limiteAlunos}
-                                              onUpdateQuantidade={handleUpdateQuantidade}
-                                            />
-                                          );
-                                        })}
-                                      </div>
-                                    )}
+                                      return (
+                                        <PreceptorCard
+                                          key={p.id}
+                                          preceptor={p}
+                                          students={students}
+                                          exceeded={exceeded}
+                                          limiteAlunos={limiteAlunos}
+                                          onUpdateQuantidade={handleUpdateQuantidade}
+                                        />
+                                      );
+                                    })}
                                   </div>
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </Fragment>
-                        );
-                      })
-                }
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
           </div>
@@ -644,7 +728,8 @@ function PreceptorCard({
           </Badge>
           {students.length > 0 && (
             <span className="text-muted-foreground">
-              {" "}— ({students.map(s => s.aluno_nome).join(", ")})
+              {" "}
+              — ({students.map((s) => s.aluno_nome).join(", ")})
             </span>
           )}
         </div>
@@ -658,9 +743,9 @@ function PreceptorCard({
             type="number"
             min={0}
             value={localQtd}
-            onChange={e => handleChange(Number(e.target.value))}
+            onChange={(e) => handleChange(Number(e.target.value))}
             className="w-16 h-7 text-center text-sm font-bold"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           />
         </div>
       </div>
@@ -700,9 +785,7 @@ function SmartCombobox({
     if (open) setSearch(value);
   }, [open, value]);
 
-  const filtered = options.filter(o =>
-    o.label.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -728,24 +811,23 @@ function SmartCombobox({
             onValueChange={setSearch}
           />
           <CommandList>
-            {filtered.length === 0 && !search.trim() && (
-              <CommandEmpty>{emptyMessage}</CommandEmpty>
-            )}
-            {search.trim() && !filtered.some(o => o.label.toLowerCase() === search.toLowerCase()) && (
-              <CommandItem
-                value={`__create__${search}`}
-                onSelect={() => {
-                  onValueChange(search.trim());
-                  setOpen(false);
-                }}
-                className="text-primary"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Usar: &ldquo;{search.trim()}&rdquo;
-              </CommandItem>
-            )}
+            {filtered.length === 0 && !search.trim() && <CommandEmpty>{emptyMessage}</CommandEmpty>}
+            {search.trim() &&
+              !filtered.some((o) => o.label.toLowerCase() === search.toLowerCase()) && (
+                <CommandItem
+                  value={`__create__${search}`}
+                  onSelect={() => {
+                    onValueChange(search.trim());
+                    setOpen(false);
+                  }}
+                  className="text-primary"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Usar: &ldquo;{search.trim()}&rdquo;
+                </CommandItem>
+              )}
             <CommandGroup>
-              {filtered.map(option => (
+              {filtered.map((option) => (
                 <CommandItem
                   key={option.value}
                   value={option.value}
@@ -754,7 +836,12 @@ function SmartCombobox({
                     setOpen(false);
                   }}
                 >
-                  <Check className={cn("mr-2 h-4 w-4", value === option.label ? "opacity-100" : "opacity-0")} />
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === option.label ? "opacity-100" : "opacity-0",
+                    )}
+                  />
                   {option.label}
                 </CommandItem>
               ))}
@@ -811,24 +898,25 @@ function AlunoMultiSelect({
   const toggle = (aluno: AlunoSimple) => {
     const isSelected = selectedAlunoIds.includes(aluno.id);
     if (isSelected) {
-      onChangeAlunoIds(selectedAlunoIds.filter(x => x !== aluno.id));
+      onChangeAlunoIds(selectedAlunoIds.filter((x) => x !== aluno.id));
     } else {
       onChangeAlunoIds([...selectedAlunoIds, aluno.id]);
-      setSelectedAlunosCache(prev => {
-        if (prev.find(a => a.id === aluno.id)) return prev;
+      setSelectedAlunosCache((prev) => {
+        if (prev.find((a) => a.id === aluno.id)) return prev;
         return [...prev, aluno];
       });
     }
   };
 
   const removeId = (id: string) => {
-    onChangeAlunoIds(selectedAlunoIds.filter(x => x !== id));
+    onChangeAlunoIds(selectedAlunoIds.filter((x) => x !== id));
   };
 
-  const selectedAlunos = selectedAlunoIds.map(id => {
-    const found = selectedAlunosCache.find(a => a.id === id) 
-               || options.find(a => a.id === id) 
-               || allAlunos.find(a => a.id === id);
+  const selectedAlunos = selectedAlunoIds.map((id) => {
+    const found =
+      selectedAlunosCache.find((a) => a.id === id) ||
+      options.find((a) => a.id === id) ||
+      allAlunos.find((a) => a.id === id);
     return found || { id, nome: "Carregando...", semestre: null };
   });
 
@@ -844,7 +932,7 @@ function AlunoMultiSelect({
       {/* Tags dos selecionados */}
       {selectedAlunos.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
-          {selectedAlunos.map(a => (
+          {selectedAlunos.map((a) => (
             <Badge
               key={a.id}
               variant="secondary"
@@ -881,33 +969,35 @@ function AlunoMultiSelect({
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
           <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="Buscar aluno…"
-              value={search}
-              onValueChange={setSearch}
-            />
+            <CommandInput placeholder="Buscar aluno…" value={search} onValueChange={setSearch} />
             <CommandList className="max-h-48">
-              {loading && <div className="p-4 text-center text-xs text-muted-foreground">Buscando...</div>}
+              {loading && (
+                <div className="p-4 text-center text-xs text-muted-foreground">Buscando...</div>
+              )}
               {!loading && options.length === 0 && (
                 <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
               )}
               <CommandGroup>
-                {!loading && options.map(a => {
-                  const isChecked = selectedAlunoIds.includes(a.id);
-                  return (
-                    <CommandItem
-                      key={a.id}
-                      value={a.id}
-                      onSelect={() => toggle(a)}
-                    >
-                      <Check className={cn("mr-2 h-3.5 w-3.5", isChecked ? "opacity-100" : "opacity-0")} />
-                      <span className="flex-1 truncate">{a.nome}</span>
-                      {a.semestre && (
-                        <span className="text-muted-foreground text-[10px] ml-2">{a.semestre}º sem.</span>
-                      )}
-                    </CommandItem>
-                  );
-                })}
+                {!loading &&
+                  options.map((a) => {
+                    const isChecked = selectedAlunoIds.includes(a.id);
+                    return (
+                      <CommandItem key={a.id} value={a.id} onSelect={() => toggle(a)}>
+                        <Check
+                          className={cn(
+                            "mr-2 h-3.5 w-3.5",
+                            isChecked ? "opacity-100" : "opacity-0",
+                          )}
+                        />
+                        <span className="flex-1 truncate">{a.nome}</span>
+                        {a.semestre && (
+                          <span className="text-muted-foreground text-[10px] ml-2">
+                            {a.semestre}º sem.
+                          </span>
+                        )}
+                      </CommandItem>
+                    );
+                  })}
                 {!loading && options.length === 50 && (
                   <div className="px-2 py-1.5 text-center text-[10px] text-muted-foreground">
                     Mostrando 50 resultados — refine a busca
@@ -924,18 +1014,25 @@ function AlunoMultiSelect({
 
 // ─── Modal: Gerenciar Unidade (Formulário Inteligente) ────────────────────────
 
-type SelectedPreceptor = {
-  type: "existing";
-  id: string;
-  nome: string;
-} | {
-  type: "new";
-  nome: string;
-  tempId: string;
-};
+type SelectedPreceptor =
+  | {
+      type: "existing";
+      id: string;
+      nome: string;
+    }
+  | {
+      type: "new";
+      nome: string;
+      tempId: string;
+    };
 
 function GerenciarUnidadeDialog({
-  open, onOpenChange, local, allLocaisSimple, allAlunos, onSaved,
+  open,
+  onOpenChange,
+  local,
+  allLocaisSimple,
+  allAlunos,
+  onSaved,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -946,16 +1043,16 @@ function GerenciarUnidadeDialog({
 }) {
   const isNew = !local;
 
-  const [nome,              setNome]            = useState("");
-  const [tipo,              setTipo]            = useState<string>("Outro");
-  const [especialidade,     setEspecialidade]   = useState<string>("");
+  const [nome, setNome] = useState("");
+  const [tipo, setTipo] = useState<string>("Outro");
+  const [especialidade, setEspecialidade] = useState<string>("");
   const [especialidadeCustom, setEspecialidadeCustom] = useState("");
   const [selectedPreceptores, setSelectedPreceptores] = useState<SelectedPreceptor[]>([]);
-  const [preceptorSearch,   setPreceptorSearch] = useState("");
-  const [saving,            setSaving]          = useState(false);
+  const [preceptorSearch, setPreceptorSearch] = useState("");
+  const [saving, setSaving] = useState(false);
   const [preceptoresOptions, setPreceptoresOptions] = useState<PreceptorSimple[]>([]);
   // Per-preceptor student selections: Map<preceptorKey, string[]>
-  const [preceptorAlunos,   setPreceptorAlunos] = useState<Record<string, string[]>>({});
+  const [preceptorAlunos, setPreceptorAlunos] = useState<Record<string, string[]>>({});
 
   // Carregar preceptores diretamente no modal ao abrir
   useEffect(() => {
@@ -984,7 +1081,8 @@ function GerenciarUnidadeDialog({
     setEspecialidade("");
     setEspecialidadeCustom("");
     setSelectedPreceptores(
-      local?.preceptoresList.map(p => ({ type: "existing" as const, id: p.id, nome: p.nome })) ?? []
+      local?.preceptoresList.map((p) => ({ type: "existing" as const, id: p.id, nome: p.nome })) ??
+        [],
     );
     setPreceptorSearch("");
     // Initialize per-preceptor aluno selections from existing data using Direct ID mapping
@@ -992,8 +1090,8 @@ function GerenciarUnidadeDialog({
     if (local) {
       for (const p of local.preceptoresList) {
         const studentIds = local.alunosVinculados
-          .filter(a => a.preceptor_id === p.id)
-          .map(a => a.aluno_id);
+          .filter((a) => a.preceptor_id === p.id)
+          .map((a) => a.aluno_id);
         if (studentIds.length > 0) initialAlunos[p.id] = studentIds;
       }
     }
@@ -1001,16 +1099,16 @@ function GerenciarUnidadeDialog({
   }, [open, local]);
 
   const toggleExisting = (p: PreceptorSimple) => {
-    setSelectedPreceptores(prev => {
-      const exists = prev.find(t => t.type === "existing" && t.id === p.id);
+    setSelectedPreceptores((prev) => {
+      const exists = prev.find((t) => t.type === "existing" && t.id === p.id);
       if (exists) {
         // Remove from tags and clear aluno selections
-        setPreceptorAlunos(pa => {
+        setPreceptorAlunos((pa) => {
           const copy = { ...pa };
           delete copy[p.id];
           return copy;
         });
-        return prev.filter(t => !(t.type === "existing" && t.id === p.id));
+        return prev.filter((t) => !(t.type === "existing" && t.id === p.id));
       }
       return [...prev, { type: "existing", id: p.id, nome: p.nome }];
     });
@@ -1018,14 +1116,15 @@ function GerenciarUnidadeDialog({
 
   const removePreceptor = (tag: SelectedPreceptor) => {
     const key = tag.type === "existing" ? tag.id : tag.tempId;
-    setPreceptorAlunos(pa => {
+    setPreceptorAlunos((pa) => {
       const copy = { ...pa };
       delete copy[key];
       return copy;
     });
-    setSelectedPreceptores(prev => {
-      if (tag.type === "existing") return prev.filter(t => !(t.type === "existing" && t.id === tag.id));
-      return prev.filter(t => !(t.type === "new" && t.tempId === tag.tempId));
+    setSelectedPreceptores((prev) => {
+      if (tag.type === "existing")
+        return prev.filter((t) => !(t.type === "existing" && t.id === tag.id));
+      return prev.filter((t) => !(t.type === "new" && t.tempId === tag.tempId));
     });
   };
 
@@ -1034,46 +1133,60 @@ function GerenciarUnidadeDialog({
     e.preventDefault();
     const searchLower = preceptorSearch.trim().toLowerCase();
 
-    const matchingExisting = preceptoresOptions.find(p => p.nome.toLowerCase() === searchLower);
+    const matchingExisting = preceptoresOptions.find((p) => p.nome.toLowerCase() === searchLower);
     if (matchingExisting) {
-      const alreadySelected = selectedPreceptores.find(t => t.type === "existing" && t.id === matchingExisting.id);
+      const alreadySelected = selectedPreceptores.find(
+        (t) => t.type === "existing" && t.id === matchingExisting.id,
+      );
       if (!alreadySelected) {
-        setSelectedPreceptores(prev => [...prev, { type: "existing", id: matchingExisting.id, nome: matchingExisting.nome }]);
+        setSelectedPreceptores((prev) => [
+          ...prev,
+          { type: "existing", id: matchingExisting.id, nome: matchingExisting.nome },
+        ]);
       }
       setPreceptorSearch("");
       return;
     }
 
-    const alreadyNew = selectedPreceptores.find(t => t.type === "new" && t.nome.toLowerCase() === searchLower);
+    const alreadyNew = selectedPreceptores.find(
+      (t) => t.type === "new" && t.nome.toLowerCase() === searchLower,
+    );
     if (alreadyNew) {
       setPreceptorSearch("");
       return;
     }
 
-    setSelectedPreceptores(prev => [...prev, {
-      type: "new",
-      nome: preceptorSearch.trim(),
-      tempId: crypto.randomUUID(),
-    }]);
+    setSelectedPreceptores((prev) => [
+      ...prev,
+      {
+        type: "new",
+        nome: preceptorSearch.trim(),
+        tempId: crypto.randomUUID(),
+      },
+    ]);
     setPreceptorSearch("");
   };
 
-  const visiblePreceptores = preceptoresOptions.filter(p =>
-    p.nome.toLowerCase().includes(preceptorSearch.toLowerCase())
+  const visiblePreceptores = preceptoresOptions.filter((p) =>
+    p.nome.toLowerCase().includes(preceptorSearch.toLowerCase()),
   );
 
-  const isSelected = (id: string) => selectedPreceptores.some(t => t.type === "existing" && t.id === id);
+  const isSelected = (id: string) =>
+    selectedPreceptores.some((t) => t.type === "existing" && t.id === id);
 
   // Compute total alunos across all preceptors
-  const totalAlunosSelecionados = Object.values(preceptorAlunos).reduce((sum, ids) => sum + ids.length, 0);
+  const totalAlunosSelecionados = Object.values(preceptorAlunos).reduce(
+    (sum, ids) => sum + ids.length,
+    0,
+  );
 
   // Helper to update aluno selections for a specific preceptor key
   const updatePreceptorAlunos = (key: string, ids: string[]) => {
-    setPreceptorAlunos(prev => ({ ...prev, [key]: ids }));
+    setPreceptorAlunos((prev) => ({ ...prev, [key]: ids }));
   };
 
   // Combobox options from locais list
-  const locaisOptions = allLocaisSimple.map(l => ({
+  const locaisOptions = allLocaisSimple.map((l) => ({
     value: l.id,
     label: l.nome,
   }));
@@ -1081,30 +1194,33 @@ function GerenciarUnidadeDialog({
   // Auto-detect tipo when selecting an existing local
   const handleNomeChange = (val: string) => {
     setNome(val);
-    const matchedLocal = allLocaisSimple.find(l => l.nome === val);
+    const matchedLocal = allLocaisSimple.find((l) => l.nome === val);
     if (matchedLocal) {
       setTipo(matchedLocal.tipo);
     }
   };
 
   async function handleSave() {
-    if (!nome.trim()) { toast.warning("Informe o nome da unidade."); return; }
+    if (!nome.trim()) {
+      toast.warning("Informe o nome da unidade.");
+      return;
+    }
     setSaving(true);
     try {
       let localId = local?.id;
-      const finalEspecialidade = especialidade === "Outra" ? especialidadeCustom.trim() : especialidade;
+      const finalEspecialidade =
+        especialidade === "Outra" ? especialidadeCustom.trim() : especialidade;
 
       // ── Verificar se o local já existe pelo nome ou criar novo ──
-      const matchedLocal = allLocaisSimple.find(l => l.nome.toLowerCase() === nome.trim().toLowerCase());
+      const matchedLocal = allLocaisSimple.find(
+        (l) => l.nome.toLowerCase() === nome.trim().toLowerCase(),
+      );
 
       if (isNew) {
         if (matchedLocal) {
           // Local já existe, usar o ID existente e atualizar tipo se necessário
           localId = matchedLocal.id;
-          const { error } = await supabase
-            .from("locais")
-            .update({ tipo })
-            .eq("id", localId);
+          const { error } = await supabase.from("locais").update({ tipo }).eq("id", localId);
           if (error) throw error;
         } else {
           // Criar novo local
@@ -1125,7 +1241,7 @@ function GerenciarUnidadeDialog({
       }
 
       // ── Criar preceptores temporários (tags novas) ──
-      const newTags = selectedPreceptores.filter(t => t.type === "new");
+      const newTags = selectedPreceptores.filter((t) => t.type === "new");
       const tempIdToRealId = new Map<string, string>();
 
       for (const tag of newTags) {
@@ -1146,8 +1262,8 @@ function GerenciarUnidadeDialog({
 
       // ── Vincular preceptores existentes selecionados ──
       const existingIds = selectedPreceptores
-        .filter(t => t.type === "existing")
-        .map(t => (t as { type: "existing"; id: string }).id);
+        .filter((t) => t.type === "existing")
+        .map((t) => (t as { type: "existing"; id: string }).id);
 
       const newCreatedIds = Array.from(tempIdToRealId.values());
       const allSelectedIds = [...existingIds, ...newCreatedIds];
@@ -1170,7 +1286,7 @@ function GerenciarUnidadeDialog({
 
       // ── Limpar vínculos operacionais antigos (evita duplicações) ──
       if (local && local.preceptoresList.length > 0) {
-        const preceptorIdsOfLocal = local.preceptoresList.map(p => p.id);
+        const preceptorIdsOfLocal = local.preceptoresList.map((p) => p.id);
         const { error: deleteError } = await supabase
           .from("vinculo_operacional")
           .delete()
@@ -1195,9 +1311,7 @@ function GerenciarUnidadeDialog({
 
       for (const tag of selectedPreceptores) {
         const key = tag.type === "existing" ? tag.id : tag.tempId;
-        const realPreceptorId = tag.type === "existing"
-          ? tag.id
-          : tempIdToRealId.get(tag.tempId);
+        const realPreceptorId = tag.type === "existing" ? tag.id : tempIdToRealId.get(tag.tempId);
         if (!realPreceptorId) continue;
 
         const selectedStudents = preceptorAlunos[key] ?? [];
@@ -1224,18 +1338,14 @@ function GerenciarUnidadeDialog({
       }
 
       if (vinculosToInsert.length > 0) {
-        const { error } = await supabase
-          .from("vinculo_operacional")
-          .insert(vinculosToInsert);
+        const { error } = await supabase.from("vinculo_operacional").insert(vinculosToInsert);
         if (error) throw error;
       }
 
       // ── UPDATE alunos.preceptor_id para refletir a vinculação ──
       for (const tag of selectedPreceptores) {
         const key = tag.type === "existing" ? tag.id : tag.tempId;
-        const realPreceptorId = tag.type === "existing"
-          ? tag.id
-          : tempIdToRealId.get(tag.tempId);
+        const realPreceptorId = tag.type === "existing" ? tag.id : tempIdToRealId.get(tag.tempId);
         if (!realPreceptorId) continue;
         const selectedStudents = preceptorAlunos[key] ?? [];
         if (selectedStudents.length === 0) continue;
@@ -1248,8 +1358,8 @@ function GerenciarUnidadeDialog({
 
       // ── Desvincular preceptores removidos (apenas em edição) ──
       if (!isNew && local) {
-        const prevIds  = local.preceptoresList.map(p => p.id);
-        const toUnlink = prevIds.filter(id => !allSelectedIds.includes(id));
+        const prevIds = local.preceptoresList.map((p) => p.id);
+        const toUnlink = prevIds.filter((id) => !allSelectedIds.includes(id));
         if (toUnlink.length > 0) {
           const { error } = await supabase
             .from("preceptores")
@@ -1299,8 +1409,10 @@ function GerenciarUnidadeDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIPOS_CAMPO.map(t => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  {TIPOS_CAMPO.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1313,7 +1425,8 @@ function GerenciarUnidadeDialog({
               <Users className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-semibold">Alocar Preceptores</p>
               <Badge variant="secondary" className="ml-auto text-xs">
-                {selectedPreceptores.length} selecionado{selectedPreceptores.length !== 1 ? "s" : ""}
+                {selectedPreceptores.length} selecionado
+                {selectedPreceptores.length !== 1 ? "s" : ""}
               </Badge>
             </div>
 
@@ -1323,7 +1436,7 @@ function GerenciarUnidadeDialog({
                 placeholder="Buscar preceptor… (Enter para criar novo)"
                 className="pl-8"
                 value={preceptorSearch}
-                onChange={e => setPreceptorSearch(e.target.value)}
+                onChange={(e) => setPreceptorSearch(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
               />
             </div>
@@ -1331,15 +1444,22 @@ function GerenciarUnidadeDialog({
             <div className="rounded-md border divide-y overflow-y-auto max-h-44 bg-background">
               {visiblePreceptores.length === 0 ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">
-                  {preceptorSearch.trim()
-                    ? <span>Nenhum preceptor encontrado. Pressione <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">Enter</kbd> para criar.</span>
-                    : "Nenhum preceptor encontrado."
-                  }
+                  {preceptorSearch.trim() ? (
+                    <span>
+                      Nenhum preceptor encontrado. Pressione{" "}
+                      <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">
+                        Enter
+                      </kbd>{" "}
+                      para criar.
+                    </span>
+                  ) : (
+                    "Nenhum preceptor encontrado."
+                  )}
                 </div>
               ) : (
-                visiblePreceptores.slice(0, 50).map(p => {
-                  const checked     = isSelected(p.id);
-                  const otherLocal  = p.local_id && p.local_id !== local?.id;
+                visiblePreceptores.slice(0, 50).map((p) => {
+                  const checked = isSelected(p.id);
+                  const otherLocal = p.local_id && p.local_id !== local?.id;
 
                   return (
                     <div
@@ -1362,7 +1482,10 @@ function GerenciarUnidadeDialog({
                         )}
                       </div>
                       {otherLocal && (
-                        <Badge variant="outline" className="text-[10px] shrink-0 text-amber-600 border-amber-400/50">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] shrink-0 text-amber-600 border-amber-400/50"
+                        >
                           Em outra unidade
                         </Badge>
                       )}
@@ -1392,8 +1515,10 @@ function GerenciarUnidadeDialog({
                 <SelectValue placeholder="Selecione a especialidade" />
               </SelectTrigger>
               <SelectContent>
-                {ESPECIALIDADES_COMUNS.map(e => (
-                  <SelectItem key={e} value={e}>{e}</SelectItem>
+                {ESPECIALIDADES_COMUNS.map((e) => (
+                  <SelectItem key={e} value={e}>
+                    {e}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -1401,7 +1526,7 @@ function GerenciarUnidadeDialog({
               <Input
                 placeholder="Digite a especialidade…"
                 value={especialidadeCustom}
-                onChange={e => setEspecialidadeCustom(e.target.value)}
+                onChange={(e) => setEspecialidadeCustom(e.target.value)}
                 className="mt-1"
               />
             )}
@@ -1420,21 +1545,20 @@ function GerenciarUnidadeDialog({
               </div>
 
               <div className="space-y-3">
-                {selectedPreceptores.map(tag => {
+                {selectedPreceptores.map((tag) => {
                   const key = tag.type === "existing" ? tag.id : tag.tempId;
                   const alunoIds = preceptorAlunos[key] ?? [];
 
                   return (
-                    <div
-                      key={key}
-                      className="rounded-lg border border-border/60 bg-muted/10 p-3"
-                    >
+                    <div key={key} className="rounded-lg border border-border/60 bg-muted/10 p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-primary" />
                           <span className="text-sm font-semibold">{tag.nome}</span>
                           {tag.type === "new" && (
-                            <Badge variant="default" className="text-[9px] py-0 px-1.5">(novo)</Badge>
+                            <Badge variant="default" className="text-[9px] py-0 px-1.5">
+                              (novo)
+                            </Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-3">

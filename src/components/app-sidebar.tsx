@@ -1,11 +1,29 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Users, GraduationCap, Stethoscope, ShieldCheck,
-  Building2, ClipboardList, Clock, FileBarChart2, Settings, BookOpenCheck,
+  LayoutDashboard,
+  Users,
+  GraduationCap,
+  Stethoscope,
+  ShieldCheck,
+  Building2,
+  ClipboardList,
+  Clock,
+  FileBarChart2,
+  Settings,
+  BookOpenCheck,
 } from "lucide-react";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
-  SidebarHeader, SidebarFooter, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth";
 
@@ -19,9 +37,7 @@ const baseItems = [
   { title: "Relatórios", url: "/relatorios", icon: FileBarChart2 },
 ];
 
-const tailItems = [
-  { title: "Configurações", url: "/configuracoes", icon: Settings },
-];
+const tailItems = [{ title: "Configurações", url: "/configuracoes", icon: Settings }];
 
 export function AppSidebar() {
   const { state } = useSidebar();

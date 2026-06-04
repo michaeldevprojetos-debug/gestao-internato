@@ -2,8 +2,22 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Pencil, Trash2 } from "lucide-react";
@@ -27,7 +41,12 @@ function RotacoesPage() {
           <p className="text-sm text-muted-foreground">Estágios e carga horária prevista.</p>
         </div>
         <RotacaoDialog
-          trigger={<Button><Plus className="mr-2 h-4 w-4" />Adicionar Novo</Button>}
+          trigger={
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar Novo
+            </Button>
+          }
           title="Nova Rotação"
         />
       </div>
@@ -43,7 +62,7 @@ function RotacoesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ROTACOES.map(r => (
+              {ROTACOES.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.nome}</TableCell>
                   <TableCell className="text-right">{r.cargaHoraria}h</TableCell>
@@ -52,7 +71,11 @@ function RotacoesPage() {
                       <Button variant="ghost" size="icon" onClick={() => setEditing(r)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -77,7 +100,11 @@ function RotacoesPage() {
 }
 
 function RotacaoDialog({
-  trigger, title, data, open, onOpenChange,
+  trigger,
+  title,
+  data,
+  open,
+  onOpenChange,
 }: {
   trigger?: React.ReactNode;
   title: string;
@@ -89,12 +116,22 @@ function RotacaoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent>
-        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
         <div className="grid gap-4 py-2">
-          <div className="grid gap-2"><Label>Nome da Rotação</Label><Input defaultValue={data?.nome} placeholder="Ex.: Pediatria" /></div>
-          <div className="grid gap-2"><Label>Carga Horária prevista</Label><Input type="number" defaultValue={data?.cargaHoraria} placeholder="240" /></div>
+          <div className="grid gap-2">
+            <Label>Nome da Rotação</Label>
+            <Input defaultValue={data?.nome} placeholder="Ex.: Pediatria" />
+          </div>
+          <div className="grid gap-2">
+            <Label>Carga Horária prevista</Label>
+            <Input type="number" defaultValue={data?.cargaHoraria} placeholder="240" />
+          </div>
         </div>
-        <DialogFooter><Button>Salvar</Button></DialogFooter>
+        <DialogFooter>
+          <Button>Salvar</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

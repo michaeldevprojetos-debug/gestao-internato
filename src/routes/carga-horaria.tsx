@@ -2,11 +2,24 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, Send, AlertCircle } from "lucide-react";
@@ -16,8 +29,13 @@ import { formatBRL } from "@/lib/mock-data";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-type PreceptorRef = { id: string; nome: string; valor_hora: number | null; especialidade: string | null };
-type RotacaoRef   = { id: string; nome: string };
+type PreceptorRef = {
+  id: string;
+  nome: string;
+  valor_hora: number | null;
+  especialidade: string | null;
+};
+type RotacaoRef = { id: string; nome: string };
 
 type LancamentoRow = {
   id: string;
@@ -31,7 +49,20 @@ type LancamentoRow = {
 
 function formatMes(m: string) {
   const [y, mm] = m.split("-");
-  const nomes = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  const nomes = [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez",
+  ];
   return `${nomes[parseInt(mm) - 1]}/${y.slice(2)}`;
 }
 
@@ -44,23 +75,22 @@ export const Route = createFileRoute("/carga-horaria")({
 
 function CargaHorariaPage() {
   const [preceptores, setPreceptores] = useState<PreceptorRef[]>([]);
-  const [rotacoes, setRotacoes]       = useState<RotacaoRef[]>([]);
+  const [rotacoes, setRotacoes] = useState<RotacaoRef[]>([]);
   const [lancamentos, setLancamentos] = useState<LancamentoRow[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // ── Form state ───────────────────────────────────────────────────────────────
-  const [mes, setMes]               = useState(() => new Date().toISOString().slice(0, 7));
+  const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
   const [preceptorId, setPreceptorId] = useState("");
-  const [rotacaoId, setRotacaoId]   = useState("");
-  const [horas, setHoras]           = useState("");
-  const [saving, setSaving]         = useState(false);
+  const [rotacaoId, setRotacaoId] = useState("");
+  const [horas, setHoras] = useState("");
+  const [saving, setSaving] = useState(false);
 
   // Custo estimado em tempo real
-  const preceptorSel = preceptores.find(p => p.id === preceptorId);
-  const custoEstimado = horas && preceptorSel
-    ? Number(horas) * (preceptorSel.valor_hora ?? 0)
-    : null;
+  const preceptorSel = preceptores.find((p) => p.id === preceptorId);
+  const custoEstimado =
+    horas && preceptorSel ? Number(horas) * (preceptorSel.valor_hora ?? 0) : null;
 
   // ── Carrega listas de referência e histórico ─────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -72,12 +102,14 @@ function CargaHorariaPage() {
         supabase.from("rotacoes").select("id, nome").order("nome"),
         supabase
           .from("vinculo_operacional")
-          .select(`
+          .select(
+            `
             id, mes_referencia, horas_realizadas,
             valor_hora_preceptor, custo_total_rotacao,
             preceptores ( nome ),
             rotacoes ( nome )
-          `)
+          `,
+          )
           .order("mes_referencia", { ascending: false })
           .limit(50),
       ]);
@@ -97,7 +129,7 @@ function CargaHorariaPage() {
           custo_total_rotacao: v.custo_total_rotacao,
           preceptor_nome: v.preceptores?.nome ?? "—",
           rotacao_nome: v.rotacoes?.nome ?? "—",
-        }))
+        })),
       );
     } catch (e: any) {
       setError(e?.message ?? "Erro ao carregar dados.");
@@ -106,7 +138,9 @@ function CargaHorariaPage() {
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // ── Lançar horas ─────────────────────────────────────────────────────────────
   async function handleLancar() {
@@ -151,20 +185,25 @@ function CargaHorariaPage() {
   }
 
   // Totais do histórico carregado
-  const totalHoras  = lancamentos.reduce((s, l) => s + (l.horas_realizadas ?? 0), 0);
-  const totalCusto  = lancamentos.reduce((s, l) => s + (l.custo_total_rotacao ?? 0), 0);
+  const totalHoras = lancamentos.reduce((s, l) => s + (l.horas_realizadas ?? 0), 0);
+  const totalCusto = lancamentos.reduce((s, l) => s + (l.custo_total_rotacao ?? 0), 0);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Carga Horária</h1>
-        <p className="text-sm text-muted-foreground">Lançamento e histórico de horas por preceptor e rotação.</p>
+        <p className="text-sm text-muted-foreground">
+          Lançamento e histórico de horas por preceptor e rotação.
+        </p>
       </div>
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4 shrink-0" />{error}
-          <Button variant="ghost" size="sm" className="ml-auto h-7" onClick={fetchData}>Tentar novamente</Button>
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+          <Button variant="ghost" size="sm" className="ml-auto h-7" onClick={fetchData}>
+            Tentar novamente
+          </Button>
         </div>
       )}
 
@@ -178,13 +217,14 @@ function CargaHorariaPage() {
               </div>
               <div>
                 <CardTitle className="text-base">Lançar Horas</CardTitle>
-                <CardDescription className="text-xs">Registra horas realizadas no Supabase</CardDescription>
+                <CardDescription className="text-xs">
+                  Registra horas realizadas no Supabase
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
           <Separator />
           <CardContent className="space-y-4 pt-4">
-
             {/* Mês */}
             <div className="grid gap-2">
               <Label htmlFor="ch-mes">Mês de referência *</Label>
@@ -192,7 +232,7 @@ function CargaHorariaPage() {
                 id="ch-mes"
                 type="month"
                 value={mes}
-                onChange={e => setMes(e.target.value)}
+                onChange={(e) => setMes(e.target.value)}
               />
             </div>
 
@@ -204,7 +244,7 @@ function CargaHorariaPage() {
                   <SelectValue placeholder={loading ? "Carregando…" : "Selecione o preceptor"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {preceptores.map(p => (
+                  {preceptores.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.nome}
                       {p.especialidade ? ` — ${p.especialidade}` : ""}
@@ -222,8 +262,10 @@ function CargaHorariaPage() {
                   <SelectValue placeholder={loading ? "Carregando…" : "Selecione a rotação"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {rotacoes.map(r => (
-                    <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                  {rotacoes.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.nome}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -239,7 +281,7 @@ function CargaHorariaPage() {
                 max={744}
                 placeholder="Ex.: 60"
                 value={horas}
-                onChange={e => setHoras(e.target.value)}
+                onChange={(e) => setHoras(e.target.value)}
               />
             </div>
 
@@ -254,11 +296,7 @@ function CargaHorariaPage() {
               </div>
             )}
 
-            <Button
-              className="w-full"
-              onClick={handleLancar}
-              disabled={saving || loading}
-            >
+            <Button className="w-full" onClick={handleLancar} disabled={saving || loading}>
               <Send className="mr-2 h-4 w-4" />
               {saving ? "Lançando…" : "Lançar Horas"}
             </Button>
@@ -300,36 +338,39 @@ function CargaHorariaPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {loading
-                    ? Array.from({ length: 8 }).map((_, i) => (
-                        <TableRow key={i}>
-                          {Array.from({ length: 5 }).map((__, j) => (
-                            <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    : lancamentos.length === 0
-                      ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                            Nenhum lançamento encontrado. Use o formulário ao lado.
+                  {loading ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        {Array.from({ length: 5 }).map((__, j) => (
+                          <TableCell key={j}>
+                            <Skeleton className="h-4 w-full" />
                           </TableCell>
-                        </TableRow>
-                      )
-                      : lancamentos.map(l => (
-                        <TableRow key={l.id}>
-                          <TableCell className="font-medium">{formatMes(l.mes_referencia)}</TableCell>
-                          <TableCell>{l.preceptor_nome}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="text-[11px]">{l.rotacao_nome}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{l.horas_realizadas ?? 0}h</TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {formatBRL(l.custo_total_rotacao ?? 0)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                  }
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : lancamentos.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                        Nenhum lançamento encontrado. Use o formulário ao lado.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    lancamentos.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="font-medium">{formatMes(l.mes_referencia)}</TableCell>
+                        <TableCell>{l.preceptor_nome}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-[11px]">
+                            {l.rotacao_nome}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{l.horas_realizadas ?? 0}h</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatBRL(l.custo_total_rotacao ?? 0)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

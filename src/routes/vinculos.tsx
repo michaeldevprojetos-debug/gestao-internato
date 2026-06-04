@@ -2,12 +2,32 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -39,28 +59,47 @@ type VinculoRow = {
   rotacao_nome?: string;
 };
 
-type AlunoRef   = { id: string; nome: string; semestre: number | null };
-type PreceptorRef = { id: string; nome: string; especialidade: string | null; unidade_vinculada: string | null; valor_hora: number | null };
+type AlunoRef = { id: string; nome: string; semestre: number | null };
+type PreceptorRef = {
+  id: string;
+  nome: string;
+  especialidade: string | null;
+  unidade_vinculada: string | null;
+  valor_hora: number | null;
+};
 type RotacaoRef = { id: string; nome: string };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatMes(m: string) {
   const [y, mm] = m.split("-");
-  const nomes = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  const nomes = [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez",
+  ];
   return `${nomes[parseInt(mm) - 1]}/${y.slice(2)}`;
 }
 
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 function VinculosPage() {
-  const [vinculos, setVinculos]   = useState<VinculoRow[]>([]);
-  const [alunos, setAlunos]       = useState<AlunoRef[]>([]);
+  const [vinculos, setVinculos] = useState<VinculoRow[]>([]);
+  const [alunos, setAlunos] = useState<AlunoRef[]>([]);
   const [preceptores, setPreceptores] = useState<PreceptorRef[]>([]);
-  const [rotacoes, setRotacoes]   = useState<RotacaoRef[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
-  const [editing, setEditing]     = useState<VinculoRow | null>(null);
+  const [rotacoes, setRotacoes] = useState<RotacaoRef[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<VinculoRow | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // ── Carrega vínculos com join manual ────────────────────────────────────────
@@ -70,7 +109,8 @@ function VinculosPage() {
     try {
       const { data, error: err } = await supabase
         .from("vinculo_operacional")
-        .select(`
+        .select(
+          `
           id,
           mes_referencia,
           horas_realizadas,
@@ -82,7 +122,8 @@ function VinculosPage() {
           alunos ( nome, semestre ),
           preceptores ( nome, especialidade, unidade_vinculada ),
           rotacoes ( nome )
-        `)
+        `,
+        )
         .order("mes_referencia", { ascending: false });
 
       if (err) throw err;
@@ -118,7 +159,10 @@ function VinculosPage() {
 
     Promise.all([
       supabase.from("alunos").select("id, nome, semestre").eq("status", "Ativo").order("nome"),
-      supabase.from("preceptores").select("id, nome, especialidade, unidade_vinculada, valor_hora").order("nome"),
+      supabase
+        .from("preceptores")
+        .select("id, nome, especialidade, unidade_vinculada, valor_hora")
+        .order("nome"),
       supabase.from("rotacoes").select("id, nome").order("nome"),
     ]).then(([a, p, r]) => {
       if (!a.error) setAlunos(a.data ?? []);
@@ -131,16 +175,13 @@ function VinculosPage() {
   async function handleDelete(id: string, aluno: string) {
     if (!confirm(`Excluir o vínculo de "${aluno}"? Esta ação não pode ser desfeita.`)) return;
 
-    const { error: err } = await supabase
-      .from("vinculo_operacional")
-      .delete()
-      .eq("id", id);
+    const { error: err } = await supabase.from("vinculo_operacional").delete().eq("id", id);
 
     if (err) {
       toast.error("Erro ao excluir vínculo: " + err.message);
     } else {
       toast.success("Vínculo excluído com sucesso.");
-      setVinculos(prev => prev.filter(v => v.id !== id));
+      setVinculos((prev) => prev.filter((v) => v.id !== id));
     }
   }
 
@@ -156,8 +197,14 @@ function VinculosPage() {
             )}
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />Novo Vínculo
+        <Button
+          onClick={() => {
+            setEditing(null);
+            setDialogOpen(true);
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Novo Vínculo
         </Button>
       </div>
 
@@ -166,7 +213,9 @@ function VinculosPage() {
         <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
-          <Button variant="ghost" size="sm" className="ml-auto h-7" onClick={fetchVinculos}>Tentar novamente</Button>
+          <Button variant="ghost" size="sm" className="ml-auto h-7" onClick={fetchVinculos}>
+            Tentar novamente
+          </Button>
         </div>
       )}
 
@@ -188,55 +237,72 @@ function VinculosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading
-                ? Array.from({ length: 6 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 10 }).map((__, j) => (
-                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                : vinculos.length === 0
-                  ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className="py-12 text-center text-muted-foreground">
-                        Nenhum vínculo encontrado. Clique em "Novo Vínculo" para começar.
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 10 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full" />
                       </TableCell>
-                    </TableRow>
-                  )
-                  : vinculos.map(v => (
-                    <TableRow key={v.id}>
-                      <TableCell className="font-medium">{formatMes(v.mes_referencia)}</TableCell>
-                      <TableCell className="font-medium">{v.aluno_nome}</TableCell>
-                      <TableCell>{v.aluno_semestre ? `${v.aluno_semestre}º` : "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{v.rotacao_nome}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs max-w-[140px] truncate" title={v.preceptor_unidade ?? ""}>
-                        {v.preceptor_unidade ?? "—"}
-                      </TableCell>
-                      <TableCell>{v.preceptor_nome}</TableCell>
-                      <TableCell className="text-right">{v.horas_realizadas ?? 0}h</TableCell>
-                      <TableCell className="text-right">{formatBRL(v.valor_hora_preceptor ?? 0)}</TableCell>
-                      <TableCell className="text-right font-semibold">{formatBRL(v.custo_total_rotacao ?? 0)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" title="Editar" onClick={() => { setEditing(v); setDialogOpen(true); }}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost" size="icon"
-                            className="text-destructive hover:text-destructive"
-                            title="Excluir"
-                            onClick={() => handleDelete(v.id, v.aluno_nome ?? "este aluno")}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-              }
+                    ))}
+                  </TableRow>
+                ))
+              ) : vinculos.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="py-12 text-center text-muted-foreground">
+                    Nenhum vínculo encontrado. Clique em "Novo Vínculo" para começar.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                vinculos.map((v) => (
+                  <TableRow key={v.id}>
+                    <TableCell className="font-medium">{formatMes(v.mes_referencia)}</TableCell>
+                    <TableCell className="font-medium">{v.aluno_nome}</TableCell>
+                    <TableCell>{v.aluno_semestre ? `${v.aluno_semestre}º` : "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{v.rotacao_nome}</Badge>
+                    </TableCell>
+                    <TableCell
+                      className="text-muted-foreground text-xs max-w-[140px] truncate"
+                      title={v.preceptor_unidade ?? ""}
+                    >
+                      {v.preceptor_unidade ?? "—"}
+                    </TableCell>
+                    <TableCell>{v.preceptor_nome}</TableCell>
+                    <TableCell className="text-right">{v.horas_realizadas ?? 0}h</TableCell>
+                    <TableCell className="text-right">
+                      {formatBRL(v.valor_hora_preceptor ?? 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatBRL(v.custo_total_rotacao ?? 0)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Editar"
+                          onClick={() => {
+                            setEditing(v);
+                            setDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          title="Excluir"
+                          onClick={() => handleDelete(v.id, v.aluno_nome ?? "este aluno")}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -263,7 +329,13 @@ function VinculosPage() {
 // ─── Dialog de criação / edição ───────────────────────────────────────────────
 
 function VinculoDialog({
-  open, onOpenChange, data, alunos, preceptores, rotacoes, onSaved,
+  open,
+  onOpenChange,
+  data,
+  alunos,
+  preceptores,
+  rotacoes,
+  onSaved,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -274,12 +346,12 @@ function VinculoDialog({
   onSaved: () => void;
 }) {
   const isEdit = !!data;
-  const [saving, setSaving]         = useState(false);
-  const [mes, setMes]               = useState("");
-  const [horas, setHoras]           = useState("");
-  const [alunoId, setAlunoId]       = useState("");
+  const [saving, setSaving] = useState(false);
+  const [mes, setMes] = useState("");
+  const [horas, setHoras] = useState("");
+  const [alunoId, setAlunoId] = useState("");
   const [preceptorId, setPreceptorId] = useState("");
-  const [rotacaoId, setRotacaoId]   = useState("");
+  const [rotacaoId, setRotacaoId] = useState("");
 
   // Preenche o form ao abrir para edição
   useEffect(() => {
@@ -299,7 +371,7 @@ function VinculoDialog({
     }
 
     const horasNum = Number(horas);
-    const preceptor = preceptores.find(p => p.id === preceptorId);
+    const preceptor = preceptores.find((p) => p.id === preceptorId);
     const valorHora = preceptor?.valor_hora ?? 0;
     const custoTotal = horasNum * valorHora;
 
@@ -324,17 +396,15 @@ function VinculoDialog({
         toast.success("Vínculo atualizado com sucesso!");
       } else {
         // ── INSERT ──────────────────────────────────────────────────────────
-        const { error: err } = await supabase
-          .from("vinculo_operacional")
-          .insert({
-            mes_referencia: mes,
-            horas_realizadas: horasNum,
-            aluno_id: alunoId,
-            preceptor_id: preceptorId,
-            rotacao_id: rotacaoId,
-            valor_hora_preceptor: valorHora,
-            custo_total_rotacao: custoTotal,
-          });
+        const { error: err } = await supabase.from("vinculo_operacional").insert({
+          mes_referencia: mes,
+          horas_realizadas: horasNum,
+          aluno_id: alunoId,
+          preceptor_id: preceptorId,
+          rotacao_id: rotacaoId,
+          valor_hora_preceptor: valorHora,
+          custo_total_rotacao: custoTotal,
+        });
 
         if (err) throw err;
         toast.success("Vínculo criado com sucesso!");
@@ -359,22 +429,32 @@ function VinculoDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
               <Label htmlFor="v-mes">Mês de referência *</Label>
-              <Input id="v-mes" type="month" value={mes} onChange={e => setMes(e.target.value)} />
+              <Input id="v-mes" type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="v-horas">Horas realizadas *</Label>
-              <Input id="v-horas" type="number" min={1} placeholder="60" value={horas} onChange={e => setHoras(e.target.value)} />
+              <Input
+                id="v-horas"
+                type="number"
+                min={1}
+                placeholder="60"
+                value={horas}
+                onChange={(e) => setHoras(e.target.value)}
+              />
             </div>
           </div>
 
           <div className="grid gap-2">
             <Label>Aluno *</Label>
             <Select value={alunoId} onValueChange={setAlunoId}>
-              <SelectTrigger><SelectValue placeholder="Selecione o aluno" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o aluno" />
+              </SelectTrigger>
               <SelectContent>
-                {alunos.map(a => (
+                {alunos.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
-                    {a.nome}{a.semestre ? ` — ${a.semestre}º sem.` : ""}
+                    {a.nome}
+                    {a.semestre ? ` — ${a.semestre}º sem.` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -384,11 +464,14 @@ function VinculoDialog({
           <div className="grid gap-2">
             <Label>Preceptor *</Label>
             <Select value={preceptorId} onValueChange={setPreceptorId}>
-              <SelectTrigger><SelectValue placeholder="Selecione o preceptor" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o preceptor" />
+              </SelectTrigger>
               <SelectContent>
-                {preceptores.map(p => (
+                {preceptores.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
-                    {p.nome}{p.especialidade ? ` — ${p.especialidade}` : ""}
+                    {p.nome}
+                    {p.especialidade ? ` — ${p.especialidade}` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -398,10 +481,14 @@ function VinculoDialog({
           <div className="grid gap-2">
             <Label>Rotação *</Label>
             <Select value={rotacaoId} onValueChange={setRotacaoId}>
-              <SelectTrigger><SelectValue placeholder="Selecione a rotação" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a rotação" />
+              </SelectTrigger>
               <SelectContent>
-                {rotacoes.map(r => (
-                  <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                {rotacoes.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.nome}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -413,10 +500,11 @@ function VinculoDialog({
               💰 Custo estimado:{" "}
               <span className="font-semibold text-foreground">
                 {formatBRL(
-                  Number(horas) * (preceptores.find(p => p.id === preceptorId)?.valor_hora ?? 0)
+                  Number(horas) * (preceptores.find((p) => p.id === preceptorId)?.valor_hora ?? 0),
                 )}
-              </span>
-              {" "}({horas}h × {formatBRL(preceptores.find(p => p.id === preceptorId)?.valor_hora ?? 0)}/h)
+              </span>{" "}
+              ({horas}h ×{" "}
+              {formatBRL(preceptores.find((p) => p.id === preceptorId)?.valor_hora ?? 0)}/h)
             </div>
           )}
         </div>

@@ -53,9 +53,18 @@ export const ROTACOES = [
 ];
 
 const nomesPreceptores = [
-  "Dra. Ana Carvalho", "Dr. Bruno Lima", "Dra. Carla Souza", "Dr. Diego Mendes",
-  "Dra. Eliana Reis", "Dr. Fábio Nogueira", "Dra. Gabriela Pinto", "Dr. Henrique Alves",
-  "Dra. Isabela Costa", "Dr. João Pedro Ramos", "Dra. Karla Vieira", "Dr. Lucas Andrade",
+  "Dra. Ana Carvalho",
+  "Dr. Bruno Lima",
+  "Dra. Carla Souza",
+  "Dr. Diego Mendes",
+  "Dra. Eliana Reis",
+  "Dr. Fábio Nogueira",
+  "Dra. Gabriela Pinto",
+  "Dr. Henrique Alves",
+  "Dra. Isabela Costa",
+  "Dr. João Pedro Ramos",
+  "Dra. Karla Vieira",
+  "Dr. Lucas Andrade",
 ];
 
 export const PRECEPTORES = nomesPreceptores.map((nome, i) => ({
@@ -68,12 +77,30 @@ export const PRECEPTORES = nomesPreceptores.map((nome, i) => ({
 }));
 
 const nomesAlunos = [
-  "Aline Barreto", "Bernardo Tavares", "Camila Freitas", "Daniel Rocha",
-  "Elisa Monteiro", "Felipe Cardoso", "Giovana Lopes", "Heitor Pacheco",
-  "Iara Nunes", "Júlio Sampaio", "Larissa Moura", "Marcos Teixeira",
-  "Natália Vasconcelos", "Otávio Brandão", "Patrícia Guimarães", "Rafael Siqueira",
-  "Sofia Bezerra", "Thiago Macedo", "Vanessa Ribeiro", "Wagner Castro",
-  "Yara Aragão", "Zélia Cordeiro", "André Filgueiras", "Beatriz Holanda",
+  "Aline Barreto",
+  "Bernardo Tavares",
+  "Camila Freitas",
+  "Daniel Rocha",
+  "Elisa Monteiro",
+  "Felipe Cardoso",
+  "Giovana Lopes",
+  "Heitor Pacheco",
+  "Iara Nunes",
+  "Júlio Sampaio",
+  "Larissa Moura",
+  "Marcos Teixeira",
+  "Natália Vasconcelos",
+  "Otávio Brandão",
+  "Patrícia Guimarães",
+  "Rafael Siqueira",
+  "Sofia Bezerra",
+  "Thiago Macedo",
+  "Vanessa Ribeiro",
+  "Wagner Castro",
+  "Yara Aragão",
+  "Zélia Cordeiro",
+  "André Filgueiras",
+  "Beatriz Holanda",
 ];
 
 export const ALUNOS = nomesAlunos.map((nome, i) => ({
@@ -86,40 +113,44 @@ export const ALUNOS = nomesAlunos.map((nome, i) => ({
 export const VINCULOS = ALUNOS.flatMap((aluno, i) => {
   const preceptor = PRECEPTORES[i % PRECEPTORES.length];
   const horas = 40 + (i % 8) * 10;
-  return [{
-    id: `v${i + 1}`,
-    mesReferencia: ["2025-09", "2025-10", "2025-11"][i % 3],
-    aluno: aluno.nome,
-    semestre: aluno.semestre,
-    especialidade: preceptor.especialidade,
-    unidade: preceptor.unidade,
-    preceptor: preceptor.nome,
-    horas,
-    valorHora: preceptor.valorHora,
-    custoTotal: horas * preceptor.valorHora,
-  }];
+  return [
+    {
+      id: `v${i + 1}`,
+      mesReferencia: ["2025-09", "2025-10", "2025-11"][i % 3],
+      aluno: aluno.nome,
+      semestre: aluno.semestre,
+      especialidade: preceptor.especialidade,
+      unidade: preceptor.unidade,
+      preceptor: preceptor.nome,
+      horas,
+      valorHora: preceptor.valorHora,
+      custoTotal: horas * preceptor.valorHora,
+    },
+  ];
 });
 
-export const totalAlunosAtivos = ALUNOS.filter(a => a.status === "Ativo").length;
+export const totalAlunosAtivos = ALUNOS.filter((a) => a.status === "Ativo").length;
 export const totalPreceptores = PRECEPTORES.length;
 export const totalHorasMensais = VINCULOS.reduce((s, v) => s + v.horas, 0);
 export const custoTotalMensal = VINCULOS.reduce((s, v) => s + v.custoTotal, 0);
 export const mediaAlunosPorPreceptor = +(totalAlunosAtivos / totalPreceptores).toFixed(1);
 export const custoMedioPorAluno = Math.round(custoTotalMensal / totalAlunosAtivos);
 
-export const custoPorPreceptor = PRECEPTORES.map(p => ({
+export const custoPorPreceptor = PRECEPTORES.map((p) => ({
   nome: p.nome.replace(/^(Dra?\.\s)/, ""),
-  custo: VINCULOS.filter(v => v.preceptor === p.nome).reduce((s, v) => s + v.custoTotal, 0),
-})).sort((a, b) => b.custo - a.custo).slice(0, 8);
+  custo: VINCULOS.filter((v) => v.preceptor === p.nome).reduce((s, v) => s + v.custoTotal, 0),
+}))
+  .sort((a, b) => b.custo - a.custo)
+  .slice(0, 8);
 
-export const alunosPorUnidade = UNIDADES.map(u => ({
+export const alunosPorUnidade = UNIDADES.map((u) => ({
   unidade: u.length > 18 ? u.slice(0, 18) + "…" : u,
-  alunos: VINCULOS.filter(v => v.unidade === u).length,
+  alunos: VINCULOS.filter((v) => v.unidade === u).length,
 })).sort((a, b) => b.alunos - a.alunos);
 
-export const distribuicaoFinanceira = ESPECIALIDADES.map(e => ({
+export const distribuicaoFinanceira = ESPECIALIDADES.map((e) => ({
   name: e,
-  value: VINCULOS.filter(v => v.especialidade === e).reduce((s, v) => s + v.custoTotal, 0),
+  value: VINCULOS.filter((v) => v.especialidade === e).reduce((s, v) => s + v.custoTotal, 0),
 }));
 
 export const formatBRL = (n: number) =>

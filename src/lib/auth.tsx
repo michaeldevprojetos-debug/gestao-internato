@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -78,8 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const login = async (email: string, password: string): Promise<User> => {
     // Etapa 1 — Autenticação no Supabase Auth
-    const { data: authData, error: authError } =
-      await supabase.auth.signInWithPassword({ email, password });
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
     if (authError || !authData.user) {
       throw new Error(authError?.message ?? "Falha na autenticação.");
@@ -100,10 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!painel) {
       // Acesso negado: faz signOut imediato e lança erro
       await supabase.auth.signOut();
-      toast.error(
-        "Acesso Negado: Seu e-mail não possui permissão neste sistema.",
-        { duration: 6000 }
-      );
+      toast.error("Acesso Negado: Seu e-mail não possui permissão neste sistema.", {
+        duration: 6000,
+      });
       throw new Error("acesso_negado");
     }
 
@@ -123,9 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, ready }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={{ user, login, logout, ready }}>{children}</AuthContext.Provider>
   );
 }
 

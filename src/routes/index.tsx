@@ -63,13 +63,25 @@ function LoginPage() {
             <form onSubmit={onSubmit} className="space-y-4">
               <div className="grid gap-2">
                 <Label htmlFor="email">E-mail</Label>
-                <Input id="email" type="email" autoComplete="email" placeholder="voce@instituicao.org"
-                  value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="voce@instituicao.org"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="senha">Senha</Label>
-                <Input id="senha" type="password" autoComplete="current-password" placeholder="••••••••"
-                  value={senha} onChange={(e) => setSenha(e.target.value)} />
+                <Input
+                  id="senha"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                />
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full" disabled={loading}>

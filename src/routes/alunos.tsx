@@ -3,12 +3,32 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { downloadCSV } from "@/lib/csv";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Pencil, Trash2, Search, Upload, Download, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -67,10 +87,10 @@ function AlunosPage() {
       const to = (pageNum + 1) * PAGE_SIZE - 1;
 
       let q = supabase
-        .from('alunos')
-        .select('id, matricula, nome, cpf, semestre, status', { count: 'exact' })
-        .not('nome', 'is', null)  // Ignora linhas sem nome preenchido
-        .order('nome', { ascending: true })
+        .from("alunos")
+        .select("id, matricula, nome, cpf, semestre, status", { count: "exact" })
+        .not("nome", "is", null) // Ignora linhas sem nome preenchido
+        .order("nome", { ascending: true })
         .range(from, to);
 
       // Filtro de busca: nome ou matrícula
@@ -121,7 +141,7 @@ function AlunosPage() {
     const rows = alunos.map((a) =>
       canSeeCPF
         ? [a.matricula ?? "", a.nome, a.cpf ?? "", String(a.semestre ?? ""), a.status ?? ""]
-        : [a.matricula ?? "", a.nome, String(a.semestre ?? ""), a.status ?? ""]
+        : [a.matricula ?? "", a.nome, String(a.semestre ?? ""), a.status ?? ""],
     );
     downloadCSV("alunos.csv", headers, rows);
   };
@@ -142,40 +162,48 @@ function AlunosPage() {
 
   // ── Limpar toda a base de alunos — deleção em cascata (sem FK violation) ─────
   async function handleDeleteAll() {
-    if (!confirm("⚠️ Tem certeza? Isso apagará TODOS os alunos e seus vínculos!\n\nEsta ação NÃO pode ser desfeita.")) return;
+    if (
+      !confirm(
+        "⚠️ Tem certeza? Isso apagará TODOS os alunos e seus vínculos!\n\nEsta ação NÃO pode ser desfeita.",
+      )
+    )
+      return;
     const tid = toast.loading("Removendo vínculos e alunos…");
     try {
       // Passo 1 — Remove vínculos operacionais que referenciam alunos (FK)
       toast.loading("Passo 1/2 — Removendo vínculos operacionais…", { id: tid });
       const { error: errVinculos } = await supabase
-        .from('vinculo_operacional')
+        .from("vinculo_operacional")
         .delete()
-        .gte('created_at', '1900-01-01');
+        .gte("created_at", "1900-01-01");
 
       if (errVinculos) {
         // Tenta com neq como fallback para vinculo_operacional
         const { error: errVinculos2 } = await supabase
-          .from('vinculo_operacional')
+          .from("vinculo_operacional")
           .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
+          .neq("id", "00000000-0000-0000-0000-000000000000");
         if (errVinculos2) {
-          console.warn("Não foi possível limpar vínculos (podem não existir):", errVinculos2.message);
+          console.warn(
+            "Não foi possível limpar vínculos (podem não existir):",
+            errVinculos2.message,
+          );
         }
       }
 
       // Passo 2 — Agora apaga os alunos (sem conflito de FK)
       toast.loading("Passo 2/2 — Removendo alunos…", { id: tid });
       const { error: errAlunos } = await supabase
-        .from('alunos')
+        .from("alunos")
         .delete()
-        .gte('created_at', '1900-01-01');
+        .gte("created_at", "1900-01-01");
 
       if (errAlunos) {
         // Fallback: neq no UUID nulo
         const { error: errAlunos2 } = await supabase
-          .from('alunos')
+          .from("alunos")
           .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
+          .neq("id", "00000000-0000-0000-0000-000000000000");
         if (errAlunos2) throw errAlunos2;
       }
 
@@ -195,23 +223,38 @@ function AlunosPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Alunos</h1>
           <p className="text-sm text-muted-foreground">
-            {loading ? "Carregando…" : (
+            {loading ? (
+              "Carregando…"
+            ) : (
               <>
-                <span className="font-medium text-foreground">{total.toLocaleString("pt-BR")}</span> internos cadastrados
+                <span className="font-medium text-foreground">{total.toLocaleString("pt-BR")}</span>{" "}
+                internos cadastrados
                 {canSeeCPF ? " (acesso completo)" : " — CPF oculto por política de privacidade"}
               </>
             )}
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />Adicionar Novo
+        <Button
+          onClick={() => {
+            setEditing(null);
+            setDialogOpen(true);
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Adicionar Novo
         </Button>
       </div>
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4 shrink-0" />{error}
-          <Button variant="ghost" size="sm" className="ml-auto h-7" onClick={() => fetchAlunos(page, query)}>
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7"
+            onClick={() => fetchAlunos(page, query)}
+          >
             Tentar novamente
           </Button>
         </div>
@@ -224,20 +267,25 @@ function AlunosPage() {
             <div className="relative max-w-sm flex-1 min-w-60">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={canSeeCPF ? "Buscar por nome, matrícula ou CPF…" : "Buscar por nome ou matrícula…"}
+                placeholder={
+                  canSeeCPF ? "Buscar por nome, matrícula ou CPF…" : "Buscar por nome ou matrícula…"
+                }
                 className="pl-8"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" />Importar planilha
+              <Upload className="mr-2 h-4 w-4" />
+              Importar planilha
             </Button>
             <Button variant="outline" onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" />Exportar CSV
+              <Download className="mr-2 h-4 w-4" />
+              Exportar CSV
             </Button>
             <Button variant="destructive" onClick={handleDeleteAll}>
-              <Trash2 className="mr-2 h-4 w-4" />Limpar Base
+              <Trash2 className="mr-2 h-4 w-4" />
+              Limpar Base
             </Button>
             <input
               ref={fileInputRef}
@@ -255,14 +303,23 @@ function AlunosPage() {
                     const buf = await file.arrayBuffer();
                     const wb = XLSX.read(buf, { type: "array" });
                     const ws = wb.Sheets[wb.SheetNames[0]];
-                    matrix = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, raw: false, defval: "" }) as string[][];
+                    matrix = XLSX.utils.sheet_to_json<string[]>(ws, {
+                      header: 1,
+                      raw: false,
+                      defval: "",
+                    }) as string[][];
                   } else {
                     const text = await file.text();
                     const sep = text.split("\n")[0].includes(";") ? ";" : ",";
-                    matrix = text.split(/\r?\n/).filter(l => l.trim()).map(l => l.split(sep));
+                    matrix = text
+                      .split(/\r?\n/)
+                      .filter((l) => l.trim())
+                      .map((l) => l.split(sep));
                   }
                 } catch (err: any) {
-                  toast.error("Não foi possível ler o arquivo: " + (err?.message ?? "formato inválido."));
+                  toast.error(
+                    "Não foi possível ler o arquivo: " + (err?.message ?? "formato inválido."),
+                  );
                   ev.target.value = "";
                   return;
                 }
@@ -271,11 +328,17 @@ function AlunosPage() {
                   ev.target.value = "";
                   return;
                 }
-                const header = matrix[0].map(h => String(h ?? "").trim().toUpperCase());
-                const idxMat = header.findIndex(h => h.includes("MATR"));
-                const idxNome = header.findIndex(h => h.includes("NOME"));
-                const idxPer = header.findIndex(h => h.includes("PERIODO") || h.includes("SEMESTRE") || h.includes("PERÍODO"));
-                const idxCpf = header.findIndex(h => h.includes("CPF"));
+                const header = matrix[0].map((h) =>
+                  String(h ?? "")
+                    .trim()
+                    .toUpperCase(),
+                );
+                const idxMat = header.findIndex((h) => h.includes("MATR"));
+                const idxNome = header.findIndex((h) => h.includes("NOME"));
+                const idxPer = header.findIndex(
+                  (h) => h.includes("PERIODO") || h.includes("SEMESTRE") || h.includes("PERÍODO"),
+                );
+                const idxCpf = header.findIndex((h) => h.includes("CPF"));
                 if (idxMat < 0 || idxNome < 0) {
                   toast.error("Planilha inválida: colunas MATRICULA e NOME são obrigatórias.");
                   ev.target.value = "";
@@ -283,17 +346,33 @@ function AlunosPage() {
                 }
                 const seenMat = new Set<string>();
                 const seenNome = new Set<string>();
-                const rows: Array<{ matricula: string; nome: string; semestre: number | null; cpf?: string | null; status: string }> = [];
-                let dupMat = 0, dupNome = 0;
+                const rows: Array<{
+                  matricula: string;
+                  nome: string;
+                  semestre: number | null;
+                  cpf?: string | null;
+                  status: string;
+                }> = [];
+                let dupMat = 0,
+                  dupNome = 0;
                 for (let i = 1; i < matrix.length; i++) {
                   const cols = matrix[i];
                   const mat = String(cols[idxMat] ?? "").trim();
-                  const nome = String(cols[idxNome] ?? "").trim().replace(/\s+/g, " ");
+                  const nome = String(cols[idxNome] ?? "")
+                    .trim()
+                    .replace(/\s+/g, " ");
                   if (!mat || !nome) continue;
-                  if (seenMat.has(mat)) { dupMat++; continue; }
+                  if (seenMat.has(mat)) {
+                    dupMat++;
+                    continue;
+                  }
                   const nomeKey = nome.toUpperCase();
-                  if (seenNome.has(nomeKey)) { dupNome++; continue; }
-                  seenMat.add(mat); seenNome.add(nomeKey);
+                  if (seenNome.has(nomeKey)) {
+                    dupNome++;
+                    continue;
+                  }
+                  seenMat.add(mat);
+                  seenNome.add(nomeKey);
                   const perRaw = idxPer >= 0 ? String(cols[idxPer] ?? "").trim() : "";
                   const per = perRaw ? parseInt(perRaw, 10) : NaN;
                   const cpf = idxCpf >= 0 ? String(cols[idxCpf] ?? "").trim() : "";
@@ -310,32 +389,37 @@ function AlunosPage() {
                   ev.target.value = "";
                   return;
                 }
-                const tid = toast.loading(`Importando ${rows.length.toLocaleString("pt-BR")} alunos…`);
+                const tid = toast.loading(
+                  `Importando ${rows.length.toLocaleString("pt-BR")} alunos…`,
+                );
                 try {
                   const BATCH = 200;
                   let inserted = 0;
                   for (let i = 0; i < rows.length; i += BATCH) {
                     const chunk = rows.slice(i, i + BATCH);
-                    const { error: err } = await supabase
-                      .from("alunos")
-                      .upsert(chunk, {
-                        onConflict: 'matricula',       // coluna com constraint alunos_matricula_unique
-                        ignoreDuplicates: false,        // atualiza em vez de ignorar duplicatas
-                      });
+                    const { error: err } = await supabase.from("alunos").upsert(chunk, {
+                      onConflict: "matricula", // coluna com constraint alunos_matricula_unique
+                      ignoreDuplicates: false, // atualiza em vez de ignorar duplicatas
+                    });
                     if (err) throw err;
                     inserted += chunk.length;
-                    toast.loading(`Importando ${inserted.toLocaleString("pt-BR")}/${rows.length.toLocaleString("pt-BR")}…`, { id: tid });
+                    toast.loading(
+                      `Importando ${inserted.toLocaleString("pt-BR")}/${rows.length.toLocaleString("pt-BR")}…`,
+                      { id: tid },
+                    );
                   }
                   const skipped = dupMat + dupNome;
                   toast.success(
                     `✅ ${inserted.toLocaleString("pt-BR")} alunos importados${skipped ? ` · ${skipped} duplicados ignorados (matrícula: ${dupMat}, nome: ${dupNome})` : ""}.`,
-                    { id: tid }
+                    { id: tid },
                   );
                   fetchAlunos(0, "");
                   setPage(0);
                   setQuery("");
                 } catch (e: any) {
-                  toast.error("Erro ao importar: " + (e?.message ?? "Tente novamente."), { id: tid });
+                  toast.error("Erro ao importar: " + (e?.message ?? "Tente novamente."), {
+                    id: tid,
+                  });
                 } finally {
                   ev.target.value = "";
                 }
@@ -357,52 +441,64 @@ function AlunosPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading
-                  ? Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                {loading ? (
+                  Array.from({ length: PAGE_SIZE }).map((_, i) => (
                     <TableRow key={i}>
                       {Array.from({ length: 6 }).map((__, j) => (
-                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                        <TableCell key={j}>
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
                       ))}
                     </TableRow>
                   ))
-                  : alunos.length === 0
-                    ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
-                          Nenhum aluno encontrado.
-                        </TableCell>
-                      </TableRow>
-                    )
-                    : alunos.map((a) => (
-                      <TableRow key={a.id}>
-                        <TableCell className="font-mono text-xs">{a.matricula ?? "—"}</TableCell>
-                        <TableCell className="font-medium">{a.nome}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {canSeeCPF ? (a.cpf ?? "—") : maskCPF(a.cpf)}
-                        </TableCell>
-                        <TableCell>{a.semestre ? `${a.semestre}º` : "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant={a.status === "Ativo" ? "default" : "secondary"}>
-                            {a.status ?? "—"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => { setEditing(a); setDialogOpen(true); }}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost" size="icon"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(a.id, a.nome)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                }
+                ) : alunos.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-center text-sm text-muted-foreground py-8"
+                    >
+                      Nenhum aluno encontrado.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  alunos.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="font-mono text-xs">{a.matricula ?? "—"}</TableCell>
+                      <TableCell className="font-medium">{a.nome}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {canSeeCPF ? (a.cpf ?? "—") : maskCPF(a.cpf)}
+                      </TableCell>
+                      <TableCell>{a.semestre ? `${a.semestre}º` : "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={a.status === "Ativo" ? "default" : "secondary"}>
+                          {a.status ?? "—"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditing(a);
+                              setDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(a.id, a.nome)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -413,10 +509,20 @@ function AlunosPage() {
               Página {page + 1} de {totalPages} · {total.toLocaleString("pt-BR")} resultado(s)
             </span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page === 0 || loading} onClick={() => setPage(p => p - 1)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 0 || loading}
+                onClick={() => setPage((p) => p - 1)}
+              >
                 Anterior
               </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages - 1 || loading} onClick={() => setPage(p => p + 1)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages - 1 || loading}
+                onClick={() => setPage((p) => p + 1)}
+              >
                 Próxima
               </Button>
             </div>
@@ -443,7 +549,11 @@ function AlunosPage() {
 // ─── Dialog ───────────────────────────────────────────────────────────────────
 
 function AlunoDialog({
-  open, onOpenChange, data, canSeeCPF, onSaved,
+  open,
+  onOpenChange,
+  data,
+  canSeeCPF,
+  onSaved,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -470,13 +580,16 @@ function AlunoDialog({
   }, [open, data]);
 
   async function handleSave() {
-    if (!nome.trim()) { toast.warning("Informe o nome do aluno."); return; }
+    if (!nome.trim()) {
+      toast.warning("Informe o nome do aluno.");
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
         nome: nome.trim(),
         matricula: matricula.trim() || null,
-        cpf: canSeeCPF ? (cpf.trim() || null) : undefined,
+        cpf: canSeeCPF ? cpf.trim() || null : undefined,
         semestre: semestre ? Number(semestre) : null,
         status,
       };
@@ -501,19 +614,26 @@ function AlunoDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>{isEdit ? "Editar Aluno" : "Novo Aluno"}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Editar Aluno" : "Novo Aluno"}</DialogTitle>
+        </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
               <Label htmlFor="a-matricula">Matrícula</Label>
-              <Input id="a-matricula" value={matricula} onChange={e => setMatricula(e.target.value)} placeholder="Matrícula" />
+              <Input
+                id="a-matricula"
+                value={matricula}
+                onChange={(e) => setMatricula(e.target.value)}
+                placeholder="Matrícula"
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="a-cpf">CPF</Label>
               <Input
                 id="a-cpf"
                 value={canSeeCPF ? cpf : ""}
-                onChange={e => setCpf(e.target.value)}
+                onChange={(e) => setCpf(e.target.value)}
                 placeholder={canSeeCPF ? "000.000.000-00" : "Restrito ao Super Admin"}
                 disabled={!canSeeCPF}
               />
@@ -521,16 +641,25 @@ function AlunoDialog({
           </div>
           <div className="grid gap-2">
             <Label htmlFor="a-nome">Nome completo *</Label>
-            <Input id="a-nome" value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome completo" />
+            <Input
+              id="a-nome"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Nome completo"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
               <Label>Semestre</Label>
               <Select value={semestre} onValueChange={setSemestre}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
                 <SelectContent>
-                  {SEMESTRES_NUM.map(s => (
-                    <SelectItem key={s} value={String(s)}>{s}º Semestre</SelectItem>
+                  {SEMESTRES_NUM.map((s) => (
+                    <SelectItem key={s} value={String(s)}>
+                      {s}º Semestre
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -538,7 +667,9 @@ function AlunoDialog({
             <div className="grid gap-2">
               <Label>Status</Label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Ativo">Ativo</SelectItem>
                   <SelectItem value="Inativo">Inativo</SelectItem>
@@ -548,7 +679,9 @@ function AlunoDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancelar
+          </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Salvando…" : isEdit ? "Salvar alterações" : "Cadastrar aluno"}
           </Button>
