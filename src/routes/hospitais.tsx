@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
+import { useSystemConfig } from "@/hooks/use-system-config";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -156,7 +157,8 @@ function HospitaisPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [limiteAlunos, setLimiteAlunos] = useState(4);
+  const { config, updateLimitePreceptor } = useSystemConfig();
+  const limiteAlunos = config.limitePreceptor;
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLocal, setEditingLocal] = useState<LocalRow | null>(null);
@@ -293,17 +295,6 @@ function HospitaisPage() {
   }, []);
 
   useEffect(() => {
-    async function loadConfig() {
-      const { data } = await supabase
-        .from("configuracoes_sistema")
-        .select("valor")
-        .eq("chave", "limite_alunos_preceptor")
-        .single();
-      if (data && data.valor) {
-        setLimiteAlunos(Number(data.valor));
-      }
-    }
-    loadConfig();
     fetchLocais();
   }, [fetchLocais]);
 
@@ -456,13 +447,9 @@ function HospitaisPage() {
                 type="number"
                 min={1}
                 value={limiteAlunos}
-                onChange={async (e) => {
+                onChange={(e) => {
                   const val = Math.max(1, Number(e.target.value));
-                  setLimiteAlunos(val);
-                  await supabase
-                    .from("configuracoes_sistema")
-                    .update({ valor: val.toString() })
-                    .eq("chave", "limite_alunos_preceptor");
+                  updateLimitePreceptor(val);
                 }}
                 className="w-16 h-8 text-center font-bold"
               />

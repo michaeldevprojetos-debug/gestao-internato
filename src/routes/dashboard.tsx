@@ -34,6 +34,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSystemConfig } from "@/hooks/use-system-config";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard Executivo — Afya" }] }),
@@ -76,7 +77,6 @@ function Stat({
   );
 }
 
-// Colors for charts
 const COLORS = [
   "#22c55e",
   "#3b82f6",
@@ -95,11 +95,8 @@ function Dashboard() {
   const [syncStatus, setSyncStatus] = useState<"syncing" | "synced">("syncing");
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  // Dynamic Settings (Configurações do Sistema)
-  const [config, setConfig] = useState({
-    limitePreceptor: 4,
-    limiteUnidade: 20,
-  });
+  // Única fonte de verdade para limites — vem do hook centralizado
+  const { config, lastUpdate: configLastUpdate } = useSystemConfig();
 
   // Filters Options
   const [unidadesOpt, setUnidadesOpt] = useState<{ id: string; nome: string }[]>([]);
@@ -119,14 +116,20 @@ function Dashboard() {
     async function fetchFilters() {
       try {
         const [resU, resE, resP] = await Promise.all([
-          supabase.from("unidades").select("id, nome").order("nome"),
-          supabase.from("especialidades").select("id, nome").order("nome"),
+          supabase
+            .from("unidades" as any)
+            .select("id, nome")
+            .order("nome"),
+          supabase
+            .from("especialidades" as any)
+            .select("id, nome")
+            .order("nome"),
           supabase.from("preceptores").select("id, nome").order("nome"),
         ]);
 
-        if (resU.data) setUnidadesOpt(resU.data);
-        if (resE.data) setEspecialidadesOpt(resE.data);
-        if (resP.data) setPreceptoresOpt(resP.data);
+        if (resU.data) setUnidadesOpt(resU.data as any);
+        if (resE.data) setEspecialidadesOpt(resE.data as any);
+        if (resP.data) setPreceptoresOpt(resP.data as any);
       } catch (err) {
         console.error("Erro ao buscar filtros:", err);
       }
@@ -134,30 +137,14 @@ function Dashboard() {
     fetchFilters();
   }, []);
 
-  // Busca dados principais e configurações
+  // Busca dados da View
   const reloadDashboard = useCallback(
     async (showLoading = true) => {
       if (showLoading) setLoading(true);
       setSyncStatus("syncing");
 
       try {
-        // 1. Busca configurações (Limites)
-        const { data: configData } = await supabase.from("configuracoes_sistema").select("*");
-
-        let newLimitePreceptor = 4;
-        let newLimiteUnidade = 20;
-
-        if (configData) {
-          const pConf = configData.find((c) => c.chave === "limite_alunos_preceptor");
-          const uConf = configData.find((c) => c.chave === "limite_alunos_unidade");
-          if (pConf) newLimitePreceptor = Number(pConf.valor);
-          if (uConf) newLimiteUnidade = Number(uConf.valor);
-        }
-
-        setConfig({ limitePreceptor: newLimitePreceptor, limiteUnidade: newLimiteUnidade });
-
-        // 2. Busca os dados da View
-        let query = supabase.from("vw_dashboard_preceptores").select("*");
+        let query = supabase.from("vw_dashboard_preceptores" as any).select("*");
 
         if (unidadeSel !== "all") query = query.eq("unidade_id", unidadeSel);
         if (especialidadeSel !== "all") query = query.eq("especialidade_id", especialidadeSel);
@@ -166,7 +153,7 @@ function Dashboard() {
         const { data, error } = await query;
         if (error) throw error;
 
-        setViewData(data || []);
+        setViewData((data as any[]) || []);
         setLastUpdate(new Date());
       } catch (err) {
         console.error("Erro ao buscar dados do dashboard:", err);
@@ -182,34 +169,22 @@ function Dashboard() {
     reloadDashboard(true);
   }, [reloadDashboard]);
 
-  // Supabase Realtime Subscription
+  // Supabase Realtime — escuta alocacoes para re-render de gráficos
   useEffect(() => {
     const channel = supabase
-      .channel("schema-db-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "alocacoes" }, (payload) => {
-        console.log("Realtime update em alocacoes:", payload);
-        reloadDashboard(false); // Atualiza dados sem loading state
+      .channel("dashboard-alocacoes-sync")
+      .on("postgres_changes" as any, { event: "*", schema: "public", table: "alocacoes" }, () => {
+        console.log("[Dashboard] Realtime: alocação alterada, recarregando...");
+        reloadDashboard(false);
       })
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "configuracoes_sistema" },
-        (payload) => {
-          console.log("Realtime update em configurações:", payload);
-          reloadDashboard(false);
-        },
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          console.log("Conectado ao Supabase Realtime");
-        }
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [reloadDashboard]);
 
-  // Derived Metrics & Chart Data
+  // Derived Metrics & Chart Data — usa config.limitePreceptor e config.limiteUnidade
   const metrics = useMemo(() => {
     const alunosUnicos = new Set(viewData.map((d) => d.aluno));
     const preceptoresUnicos = new Set(viewData.map((d) => d.preceptor));
@@ -220,7 +195,6 @@ function Dashboard() {
     const preceptorQtd = preceptoresUnicos.size;
     const media = preceptorQtd > 0 ? (alunosQtd / preceptorQtd).toFixed(1) : "0";
 
-    // Aggregations
     const preceptorMap: Record<
       string,
       { nome: string; especialidade: string; alunos: Set<string>; horas: number }
@@ -267,10 +241,14 @@ function Dashboard() {
       .map(([name, alunosSet]) => ({ unidade: name, alunos: alunosSet.size }))
       .sort((a, b) => b.alunos - a.alunos);
 
-    // Alerts usando a única fonte de verdade (Dynamic config)
+    // Alertas dinâmicos usando config do hook (única fonte de verdade)
     const alertasPreceptores = Object.values(preceptorMap)
       .filter((p) => p.alunos.size > config.limitePreceptor)
-      .map((p) => ({ nome: p.nome, especialidade: p.especialidade, alunos: p.alunos.size }))
+      .map((p) => ({
+        nome: p.nome,
+        especialidade: p.especialidade,
+        alunos: p.alunos.size,
+      }))
       .sort((a, b) => b.alunos - a.alunos);
 
     const alertasUnidades = Object.entries(unidadeMap)
@@ -292,6 +270,9 @@ function Dashboard() {
     };
   }, [viewData, config]);
 
+  // Timestamp mais recente entre dados e config
+  const effectiveLastUpdate = configLastUpdate > lastUpdate ? configLastUpdate : lastUpdate;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-background text-slate-900 dark:text-foreground -m-4 sm:-m-6 lg:-m-8 p-4 sm:p-6 lg:p-8">
       <div className="space-y-6 max-w-7xl mx-auto">
@@ -307,7 +288,7 @@ function Dashboard() {
             </span>
           )}
           <span className="text-slate-500 dark:text-slate-400 font-mono">
-            Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
+            Última atualização: {effectiveLastUpdate.toLocaleTimeString("pt-BR")}
           </span>
         </div>
 
@@ -548,7 +529,11 @@ function Dashboard() {
                           boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                         }}
                         itemStyle={{ color: "#E2E8F0" }}
-                        labelStyle={{ color: "#94A3B8", fontWeight: "bold", marginBottom: "4px" }}
+                        labelStyle={{
+                          color: "#94A3B8",
+                          fontWeight: "bold",
+                          marginBottom: "4px",
+                        }}
                         formatter={(value: any, name: string) => [
                           value,
                           name === "alunosCount" ? "Qtd Alunos" : "Carga Horária (h)",
@@ -606,7 +591,7 @@ function Dashboard() {
                         paddingAngle={2}
                         stroke="none"
                       >
-                        {metrics.alunosPorEspecialidade.map((entry, index) => (
+                        {metrics.alunosPorEspecialidade.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
