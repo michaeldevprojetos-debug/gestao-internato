@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -23,7 +23,16 @@ import {
   Bar,
 } from "recharts";
 import { ClientOnly } from "@/components/client-only";
-import { Users, Stethoscope, Clock, Building2, Activity, AlertTriangle } from "lucide-react";
+import {
+  Users,
+  Stethoscope,
+  Clock,
+  Building2,
+  Activity,
+  AlertTriangle,
+  RefreshCw,
+  CheckCircle2,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/dashboard")({
@@ -83,6 +92,14 @@ const COLORS = [
 
 function Dashboard() {
   const [loading, setLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<"syncing" | "synced">("syncing");
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // Dynamic Settings (Configurações do Sistema)
+  const [config, setConfig] = useState({
+    limitePreceptor: 4,
+    limiteUnidade: 20,
+  });
 
   // Filters Options
   const [unidadesOpt, setUnidadesOpt] = useState<{ id: string; nome: string }[]>([]);
@@ -97,6 +114,7 @@ function Dashboard() {
   // Dashboard Data from View
   const [viewData, setViewData] = useState<any[]>([]);
 
+  // Carrega opções de filtros
   useEffect(() => {
     async function fetchFilters() {
       try {
@@ -116,10 +134,29 @@ function Dashboard() {
     fetchFilters();
   }, []);
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
+  // Busca dados principais e configurações
+  const reloadDashboard = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) setLoading(true);
+      setSyncStatus("syncing");
+
       try {
+        // 1. Busca configurações (Limites)
+        const { data: configData } = await supabase.from("configuracoes_sistema").select("*");
+
+        let newLimitePreceptor = 4;
+        let newLimiteUnidade = 20;
+
+        if (configData) {
+          const pConf = configData.find((c) => c.chave === "limite_alunos_preceptor");
+          const uConf = configData.find((c) => c.chave === "limite_alunos_unidade");
+          if (pConf) newLimitePreceptor = Number(pConf.valor);
+          if (uConf) newLimiteUnidade = Number(uConf.valor);
+        }
+
+        setConfig({ limitePreceptor: newLimitePreceptor, limiteUnidade: newLimiteUnidade });
+
+        // 2. Busca os dados da View
         let query = supabase.from("vw_dashboard_preceptores").select("*");
 
         if (unidadeSel !== "all") query = query.eq("unidade_id", unidadeSel);
@@ -130,15 +167,47 @@ function Dashboard() {
         if (error) throw error;
 
         setViewData(data || []);
+        setLastUpdate(new Date());
       } catch (err) {
         console.error("Erro ao buscar dados do dashboard:", err);
       } finally {
         setLoading(false);
+        setSyncStatus("synced");
       }
-    }
+    },
+    [unidadeSel, especialidadeSel, preceptorSel],
+  );
 
-    fetchData();
-  }, [unidadeSel, especialidadeSel, preceptorSel]);
+  useEffect(() => {
+    reloadDashboard(true);
+  }, [reloadDashboard]);
+
+  // Supabase Realtime Subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel("schema-db-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "alocacoes" }, (payload) => {
+        console.log("Realtime update em alocacoes:", payload);
+        reloadDashboard(false); // Atualiza dados sem loading state
+      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "configuracoes_sistema" },
+        (payload) => {
+          console.log("Realtime update em configurações:", payload);
+          reloadDashboard(false);
+        },
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("Conectado ao Supabase Realtime");
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [reloadDashboard]);
 
   // Derived Metrics & Chart Data
   const metrics = useMemo(() => {
@@ -151,18 +220,15 @@ function Dashboard() {
     const preceptorQtd = preceptoresUnicos.size;
     const media = preceptorQtd > 0 ? (alunosQtd / preceptorQtd).toFixed(1) : "0";
 
-    // Preceptor Aggregation (for Ranking and Alerts)
+    // Aggregations
     const preceptorMap: Record<
       string,
       { nome: string; especialidade: string; alunos: Set<string>; horas: number }
     > = {};
-    // Specialty Aggregation
     const especialidadeMap: Record<string, Set<string>> = {};
-    // Unit Aggregation
     const unidadeMap: Record<string, Set<string>> = {};
 
     viewData.forEach((d) => {
-      // Preceptor
       if (!preceptorMap[d.preceptor_id]) {
         preceptorMap[d.preceptor_id] = {
           nome: d.preceptor,
@@ -174,18 +240,15 @@ function Dashboard() {
       preceptorMap[d.preceptor_id].alunos.add(d.aluno);
       preceptorMap[d.preceptor_id].horas += Number(d.carga_horaria) || 0;
 
-      // Specialty
       const espName = d.especialidade || "Sem Especialidade";
       if (!especialidadeMap[espName]) especialidadeMap[espName] = new Set();
       especialidadeMap[espName].add(d.aluno);
 
-      // Unit
       const unitName = d.unidade || "Desconhecida";
       if (!unidadeMap[unitName]) unidadeMap[unitName] = new Set();
       unidadeMap[unitName].add(d.aluno);
     });
 
-    // Chart 1: Ranking Preceptores (Top 10)
     const topPreceptores = Object.values(preceptorMap)
       .map((p) => ({
         nome: p.nome,
@@ -196,24 +259,22 @@ function Dashboard() {
       .sort((a, b) => b.alunosCount - a.alunosCount)
       .slice(0, 10);
 
-    // Chart 2: Alunos por Especialidade
     const alunosPorEspecialidade = Object.entries(especialidadeMap)
       .map(([name, alunosSet]) => ({ name, value: alunosSet.size }))
       .sort((a, b) => b.value - a.value);
 
-    // Chart 3: Ocupação por Unidade
     const ocupacaoPorUnidade = Object.entries(unidadeMap)
       .map(([name, alunosSet]) => ({ unidade: name, alunos: alunosSet.size }))
       .sort((a, b) => b.alunos - a.alunos);
 
-    // Alerts
+    // Alerts usando a única fonte de verdade (Dynamic config)
     const alertasPreceptores = Object.values(preceptorMap)
-      .filter((p) => p.alunos.size > 3)
+      .filter((p) => p.alunos.size > config.limitePreceptor)
       .map((p) => ({ nome: p.nome, especialidade: p.especialidade, alunos: p.alunos.size }))
       .sort((a, b) => b.alunos - a.alunos);
 
     const alertasUnidades = Object.entries(unidadeMap)
-      .filter(([_, set]) => set.size > 20)
+      .filter(([_, set]) => set.size > config.limiteUnidade)
       .map(([nome, set]) => ({ nome, alunos: set.size }))
       .sort((a, b) => b.alunos - a.alunos);
 
@@ -229,13 +290,29 @@ function Dashboard() {
       alertasPreceptores,
       alertasUnidades,
     };
-  }, [viewData]);
+  }, [viewData, config]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-background text-slate-900 dark:text-foreground -m-4 sm:-m-6 lg:-m-8 p-4 sm:p-6 lg:p-8">
       <div className="space-y-6 max-w-7xl mx-auto">
+        {/* STATUS BAR (Feedback Visual) */}
+        <div className="flex items-center justify-end gap-3 text-xs">
+          {syncStatus === "syncing" ? (
+            <span className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-400 font-medium bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded-full">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Atualizando...
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-green-700 dark:text-green-400 font-medium bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Dados Sincronizados
+            </span>
+          )}
+          <span className="text-slate-500 dark:text-slate-400 font-mono">
+            Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
+          </span>
+        </div>
+
         {/* HEADER & FILTERS */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-[#111827] p-5 rounded-xl shadow-sm border border-slate-200 dark:border-white/10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-[#111827] p-5 rounded-xl shadow-sm border border-slate-200 dark:border-white/10 mt-2">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
               <Activity className="h-8 w-8 text-primary dark:text-[#4ade80]" />
@@ -329,13 +406,13 @@ function Dashboard() {
         {/* ALERTS SECTION */}
         <div className="grid gap-4 md:grid-cols-2">
           {/* Preceptors Alert */}
-          <Card className="border-red-200 bg-red-50/50 dark:border-red-900/50 dark:bg-red-950/20 shadow-sm">
+          <Card className="border-red-200 bg-red-50/50 dark:border-red-900/50 dark:bg-red-950/20 shadow-sm transition-all">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" /> Alerta: Preceptores
               </CardTitle>
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-400">
-                Acima de 3 Alunos
+                Acima de {config.limitePreceptor} Alunos
               </span>
             </CardHeader>
             <CardContent>
@@ -371,13 +448,13 @@ function Dashboard() {
           </Card>
 
           {/* Units Alert */}
-          <Card className="border-orange-200 bg-orange-50/50 dark:border-orange-900/50 dark:bg-orange-950/20 shadow-sm">
+          <Card className="border-orange-200 bg-orange-50/50 dark:border-orange-900/50 dark:bg-orange-950/20 shadow-sm transition-all">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-bold text-orange-700 dark:text-orange-400 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" /> Alerta: Unidades
               </CardTitle>
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded bg-orange-100 text-orange-600 dark:bg-orange-900/50 dark:text-orange-400">
-                Acima de 20 Alunos
+                Acima de {config.limiteUnidade} Alunos
               </span>
             </CardHeader>
             <CardContent>

@@ -42,7 +42,20 @@ CREATE TABLE IF NOT EXISTS public.alocacoes (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- RECRIAÇÃO DA VIEW REAL-TIME PARA O DASHBOARD
+-- ETAPA 1: TABELA DE CONFIGURAÇÕES (ÚNICA FONTE DE VERDADE)
+CREATE TABLE IF NOT EXISTS public.configuracoes_sistema (
+    chave TEXT PRIMARY KEY,
+    valor TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+INSERT INTO public.configuracoes_sistema (chave, valor)
+VALUES 
+  ('limite_alunos_preceptor', '4'),
+  ('limite_alunos_unidade', '20')
+ON CONFLICT (chave) DO NOTHING;
+
+-- RECRIAÇÃO DA VIEW REAL-TIME PARA O DASHBOARD EXECUTIVO
 DROP VIEW IF EXISTS public.vw_dashboard_preceptores CASCADE;
 CREATE OR REPLACE VIEW public.vw_dashboard_preceptores AS
 SELECT
@@ -60,3 +73,6 @@ INNER JOIN public.alunos a ON a.id = al.aluno_id
 INNER JOIN public.preceptores p ON p.id = al.preceptor_id
 INNER JOIN public.unidades u ON u.id = al.unidade_id
 LEFT JOIN public.especialidades e ON e.id = al.especialidade_id;
+
+-- Adiciona as tabelas ao canal publico para ouvirmos via Realtime (precisa estar ativado no painel Supabase também)
+ALTER PUBLICATION supabase_realtime ADD TABLE public.configuracoes_sistema;

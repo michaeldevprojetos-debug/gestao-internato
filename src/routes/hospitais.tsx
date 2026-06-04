@@ -293,6 +293,17 @@ function HospitaisPage() {
   }, []);
 
   useEffect(() => {
+    async function loadConfig() {
+      const { data } = await supabase
+        .from("configuracoes_sistema")
+        .select("valor")
+        .eq("chave", "limite_alunos_preceptor")
+        .single();
+      if (data && data.valor) {
+        setLimiteAlunos(Number(data.valor));
+      }
+    }
+    loadConfig();
     fetchLocais();
   }, [fetchLocais]);
 
@@ -445,7 +456,14 @@ function HospitaisPage() {
                 type="number"
                 min={1}
                 value={limiteAlunos}
-                onChange={(e) => setLimiteAlunos(Math.max(1, Number(e.target.value)))}
+                onChange={async (e) => {
+                  const val = Math.max(1, Number(e.target.value));
+                  setLimiteAlunos(val);
+                  await supabase
+                    .from("configuracoes_sistema")
+                    .update({ valor: val.toString() })
+                    .eq("chave", "limite_alunos_preceptor");
+                }}
                 className="w-16 h-8 text-center font-bold"
               />
             </div>
