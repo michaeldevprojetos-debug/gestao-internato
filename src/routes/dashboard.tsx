@@ -360,10 +360,11 @@ function Dashboard() {
     const especialidades = [...new Set(rows.map((r: any) => r.text_especialidade || r.especialidade).filter(Boolean))];
     const alunos = [...new Set(rows.map((r: any) => r.aluno).filter(Boolean))];
     const turnos = [...new Set(rows.map((r: any) => getTurnoLabel(r.hora_inicio, r.hora_fim)))];
-    // Filtrar alocações únicas antes de somar as horas para remover duplicidade de alunos
+    // Filtrar alocações únicas por turno/hospital para remover duplicidade de alunos
     const uniqueAlocs = new Map();
     rows.forEach((r: any) => {
-      const id = r.alocacao_id || Math.random();
+      // Cria uma chave única baseada no hospital e no período do turno
+      const id = `${r.unidade}-${r.data_inicio}-${r.data_fim}-${r.hora_inicio}-${r.hora_fim}`;
       if (!uniqueAlocs.has(id)) uniqueAlocs.set(id, r);
     });
     const uniqueRows = Array.from(uniqueAlocs.values());
