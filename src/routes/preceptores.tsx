@@ -72,13 +72,16 @@ function PreceptoresPage() {
           .from("preceptores" as any)
           .select("id, nome, especialidade_id, ativo, especialidades(nome)")
           .order("nome"),
-        supabase.from("especialidades" as any).select("id, nome").order("nome")
+        supabase
+          .from("especialidades" as any)
+          .select("id, nome")
+          .order("nome"),
       ]);
 
       if (precRes.error) throw precRes.error;
       if (espRes.error) throw espRes.error;
 
-      setEspecialidades((espRes.data || []) as Especialidade[]);
+      setEspecialidades((espRes.data || []) as unknown as Especialidade[]);
 
       const rows: PreceptorRow[] = ((precRes.data || []) as any[]).map((p) => ({
         id: p.id,
@@ -107,8 +110,8 @@ function PreceptoresPage() {
       preceptores.filter(
         (p) =>
           p.nome.toLowerCase().includes(term) ||
-          (p.especialidade_nome && p.especialidade_nome.toLowerCase().includes(term))
-      )
+          (p.especialidade_nome && p.especialidade_nome.toLowerCase().includes(term)),
+      ),
     );
   }, [query, preceptores]);
 
@@ -125,7 +128,10 @@ function PreceptoresPage() {
   async function handleDelete(id: string, nome: string) {
     if (!confirm(`Tem certeza que deseja inativar "${nome}"?`)) return;
     try {
-      const { error } = await supabase.from("preceptores" as any).update({ ativo: false }).eq("id", id);
+      const { error } = await supabase
+        .from("preceptores" as any)
+        .update({ ativo: false })
+        .eq("id", id);
       if (error) throw error;
       toast.success("Preceptor inativado com sucesso.");
       fetchData();
@@ -139,9 +145,7 @@ function PreceptoresPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Preceptores</h1>
-          <p className="text-sm text-muted-foreground">
-            Cadastro de preceptores e especialidades.
-          </p>
+          <p className="text-sm text-muted-foreground">Cadastro de preceptores e especialidades.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
@@ -152,7 +156,12 @@ function PreceptoresPage() {
             <Download className="mr-2 h-4 w-4" />
             Exportar
           </Button>
-          <Button onClick={() => { setEditingPreceptor(null); setDialogOpen(true); }}>
+          <Button
+            onClick={() => {
+              setEditingPreceptor(null);
+              setDialogOpen(true);
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Adicionar Novo
           </Button>
@@ -187,10 +196,18 @@ function PreceptoresPage() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-16 mx-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-48" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-32" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-16 mx-auto" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-8 w-16 ml-auto" />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : filtered.length === 0 ? (
@@ -212,9 +229,19 @@ function PreceptoresPage() {
                     </TableCell>
                     <TableCell className="text-center">
                       {p.ativo ? (
-                        <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Ativo</Badge>
+                        <Badge
+                          variant="outline"
+                          className="text-green-600 border-green-200 bg-green-50"
+                        >
+                          Ativo
+                        </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-slate-500 border-slate-200 bg-slate-50">Inativo</Badge>
+                        <Badge
+                          variant="outline"
+                          className="text-slate-500 border-slate-200 bg-slate-50"
+                        >
+                          Inativo
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
@@ -222,7 +249,10 @@ function PreceptoresPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => { setEditingPreceptor(p); setDialogOpen(true); }}
+                          onClick={() => {
+                            setEditingPreceptor(p);
+                            setDialogOpen(true);
+                          }}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -298,7 +328,10 @@ function PreceptorDialog({
       };
 
       if (isEdit && preceptor) {
-        const { error } = await supabase.from("preceptores" as any).update(data).eq("id", preceptor.id);
+        const { error } = await supabase
+          .from("preceptores" as any)
+          .update(data)
+          .eq("id", preceptor.id);
         if (error) throw error;
         toast.success("Preceptor atualizado.");
       } else {
@@ -324,16 +357,25 @@ function PreceptorDialog({
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
             <Label htmlFor="nome">Nome *</Label>
-            <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Dr(a). Nome Completo" />
+            <Input
+              id="nome"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Dr(a). Nome Completo"
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="esp">Especialidade</Label>
             <Select value={especialidadeId} onValueChange={setEspecialidadeId}>
-              <SelectTrigger id="esp"><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectTrigger id="esp">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Nenhuma</SelectItem>
                 {especialidades.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.nome}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -341,8 +383,13 @@ function PreceptorDialog({
           {isEdit && (
             <div className="grid gap-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={ativo ? "ativo" : "inativo"} onValueChange={(v) => setAtivo(v === "ativo")}>
-                <SelectTrigger id="status"><SelectValue /></SelectTrigger>
+              <Select
+                value={ativo ? "ativo" : "inativo"}
+                onValueChange={(v) => setAtivo(v === "ativo")}
+              >
+                <SelectTrigger id="status">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ativo">Ativo</SelectItem>
                   <SelectItem value="inativo">Inativo</SelectItem>
@@ -352,8 +399,12 @@ function PreceptorDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando..." : isEdit ? "Salvar" : "Criar"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Salvando..." : isEdit ? "Salvar" : "Criar"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

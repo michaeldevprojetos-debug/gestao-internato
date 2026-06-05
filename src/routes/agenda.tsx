@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
-import ptBR from "date-fns/locale/pt-BR";
+import { ptBR } from "date-fns/locale/pt-BR";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
 import { Button } from "@/components/ui/button";
@@ -59,16 +59,14 @@ type AgendaEvent = {
 function AgendaPage() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [alocacoes, setAlocacoes] = useState<any[]>([]);
-  
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const fetchAgenda = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("agenda_preceptoria" as any)
-        .select(`
+      const { data, error } = await supabase.from("agenda_preceptoria" as any).select(`
           id, data, hora_inicio, hora_fim, status,
           aluno_id, preceptor_id, unidade_id, especialidade_id,
           alunos(nome), preceptores(nome), unidades(nome)
@@ -104,16 +102,22 @@ function AgendaPage() {
     const hoje = new Date().toISOString().split("T")[0];
     supabase
       .from("alocacoes" as any)
-      .select(`
+      .select(
+        `
         id, aluno_id, preceptor_id, unidade_id, especialidade_id,
         alunos(nome), preceptores(nome), unidades(nome), especialidades(nome)
-      `)
+      `,
+      )
       .or(`data_fim.is.null,data_fim.gte.${hoje}`)
       .then(({ data }) => setAlocacoes(data || []));
 
     const subscription = supabase
       .channel("agenda_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "agenda_preceptoria" }, fetchAgenda)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "agenda_preceptoria" },
+        fetchAgenda,
+      )
       .subscribe();
 
     return () => {
@@ -138,15 +142,23 @@ function AgendaPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Agenda de Preceptoria</h1>
-          <p className="text-sm text-muted-foreground">Distribuição diária de alunos e preceptores.</p>
+          <p className="text-sm text-muted-foreground">
+            Distribuição diária de alunos e preceptores.
+          </p>
         </div>
-        <Button onClick={() => { setSelectedDate(new Date()); setSelectedEvent(null); setDialogOpen(true); }}>
+        <Button
+          onClick={() => {
+            setSelectedDate(new Date());
+            setSelectedEvent(null);
+            setDialogOpen(true);
+          }}
+        >
           <Plus className="mr-2 h-4 w-4" />
           Novo Evento
         </Button>
       </div>
 
-      <Card className="flex-1 min-h-[600px]">
+      <Card className="flex-1 min-h-[150px]">
         <CardContent className="p-4 h-full">
           <Calendar
             localizer={localizer}
@@ -194,10 +206,19 @@ function AgendaPage() {
 }
 
 function AgendaDialog({
-  open, onOpenChange, event, initialDate, alocacoes, onSaved
+  open,
+  onOpenChange,
+  event,
+  initialDate,
+  alocacoes,
+  onSaved,
 }: {
-  open: boolean; onOpenChange: (o: boolean) => void; event: AgendaEvent | null; initialDate: Date | null;
-  alocacoes: any[]; onSaved: () => void;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  event: AgendaEvent | null;
+  initialDate: Date | null;
+  alocacoes: any[];
+  onSaved: () => void;
 }) {
   const isEdit = !!event;
   const [saving, setSaving] = useState(false);
@@ -210,11 +231,14 @@ function AgendaDialog({
   useEffect(() => {
     if (open) {
       setStatus(event?.status ?? "ativo");
-      
+
       if (event) {
         // Encontrar a alocação que corresponde a este evento
         const match = alocacoes.find(
-          (a) => a.aluno_id === event.aluno_id && a.preceptor_id === event.preceptor_id && a.unidade_id === event.unidade_id
+          (a) =>
+            a.aluno_id === event.aluno_id &&
+            a.preceptor_id === event.preceptor_id &&
+            a.unidade_id === event.unidade_id,
         );
         if (match) setAlocacaoId(match.id);
         else setAlocacaoId("");
@@ -252,7 +276,10 @@ function AgendaDialog({
       };
 
       if (isEdit && event) {
-        const { error } = await supabase.from("agenda_preceptoria" as any).update(payload).eq("id", event.id);
+        const { error } = await supabase
+          .from("agenda_preceptoria" as any)
+          .update(payload)
+          .eq("id", event.id);
         if (error) throw error;
         toast.success("Evento atualizado!");
       } else {
@@ -272,7 +299,10 @@ function AgendaDialog({
   async function handleDelete() {
     if (!event || !confirm("Tem certeza que deseja excluir este evento?")) return;
     try {
-      const { error } = await supabase.from("agenda_preceptoria" as any).delete().eq("id", event.id);
+      const { error } = await supabase
+        .from("agenda_preceptoria" as any)
+        .delete()
+        .eq("id", event.id);
       if (error) throw error;
       toast.success("Evento excluído.");
       onOpenChange(false);
@@ -292,7 +322,9 @@ function AgendaDialog({
           <div className="grid gap-2">
             <Label>Vínculo Ativo *</Label>
             <Select value={alocacaoId} onValueChange={setAlocacaoId} disabled={isEdit}>
-              <SelectTrigger><SelectValue placeholder="Selecione o vínculo (Aluno → Preceptor)" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o vínculo (Aluno → Preceptor)" />
+              </SelectTrigger>
               <SelectContent>
                 {alocacoes.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
@@ -301,9 +333,13 @@ function AgendaDialog({
                 ))}
               </SelectContent>
             </Select>
-            {isEdit && <p className="text-[10px] text-muted-foreground">O vínculo não pode ser alterado após a criação.</p>}
+            {isEdit && (
+              <p className="text-[10px] text-muted-foreground">
+                O vínculo não pode ser alterado após a criação.
+              </p>
+            )}
           </div>
-          
+
           <div className="grid gap-2">
             <Label>Data *</Label>
             <Input type="date" value={dataStr} onChange={(e) => setDataStr(e.target.value)} />
@@ -311,7 +347,11 @@ function AgendaDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
               <Label>Hora Início *</Label>
-              <Input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+              <Input
+                type="time"
+                value={horaInicio}
+                onChange={(e) => setHoraInicio(e.target.value)}
+              />
             </div>
             <div className="grid gap-2">
               <Label>Hora Fim *</Label>
@@ -322,7 +362,9 @@ function AgendaDialog({
           <div className="grid gap-2">
             <Label>Status</Label>
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ativo">Ativo</SelectItem>
                 <SelectItem value="concluído">Concluído</SelectItem>
@@ -337,10 +379,16 @@ function AgendaDialog({
               <Trash2 className="h-4 w-4 mr-2" />
               Excluir
             </Button>
-          ) : <div />}
+          ) : (
+            <div />
+          )}
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando..." : isEdit ? "Salvar" : "Criar"}</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Salvando..." : isEdit ? "Salvar" : "Criar"}
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>

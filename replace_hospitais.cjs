@@ -1,17 +1,15 @@
-const fs = require('fs');
-let code = fs.readFileSync('src/routes/hospitais.tsx', 'utf8');
+const fs = require("fs");
+let code = fs.readFileSync("src/routes/hospitais.tsx", "utf8");
 
-code = code.replace(
-  /supabase\.from\(\"vinculo_operacional\"\)/g,
-  'supabase.from(\"alocacoes\")'
-);
+code = code.replace(/supabase\.from\(\"vinculo_operacional\"\)/g, 'supabase.from(\"alocacoes\")');
 
 code = code.replace(
   /select\(\"id, preceptor_id, aluno_id, quantidade_alunos, alunos \\( nome, semestre \\)\"\)/g,
-  'select(\"id, preceptor_id, aluno_id, alunos ( nome, semestre )\")'
+  'select(\"id, preceptor_id, aluno_id, alunos ( nome, semestre )\")',
 );
 
-const insertBlockRegex = /const vinculosToInsert: Array<\{[\s\S]*?\}> = \[\];[\s\S]*?if \(vinculosToInsert\.length > 0\) \{[\s\S]*?supabase\.from\(\"alocacoes\"\)\.insert\(vinculosToInsert\);[\s\S]*?\}/;
+const insertBlockRegex =
+  /const vinculosToInsert: Array<\{[\s\S]*?\}> = \[\];[\s\S]*?if \(vinculosToInsert\.length > 0\) \{[\s\S]*?supabase\.from\(\"alocacoes\"\)\.insert\(vinculosToInsert\);[\s\S]*?\}/;
 
 const newBlock = `const alocacoesToInsert: Array<{
         preceptor_id: string;
@@ -61,5 +59,5 @@ const newBlock = `const alocacoesToInsert: Array<{
 
 code = code.replace(insertBlockRegex, newBlock);
 
-fs.writeFileSync('src/routes/hospitais.tsx', code);
-console.log('Replaced');
+fs.writeFileSync("src/routes/hospitais.tsx", code);
+console.log("Replaced");

@@ -1,7 +1,8 @@
-const fs = require('fs');
-let code = fs.readFileSync('src/routes/dashboard.tsx', 'utf8');
+const fs = require("fs");
+let code = fs.readFileSync("src/routes/dashboard.tsx", "utf8");
 
-const fetchDataRegex = /const \{ data: alocData \} = await supabase[\s\S]*?setAlocacoes\(alocData \|\| \[\]\);/;
+const fetchDataRegex =
+  /const \{ data: alocData \} = await supabase[\s\S]*?setAlocacoes\(alocData \|\| \[\]\);/;
 
 const newFetchData = `      const { data: alocData } = await supabase
         .from("vw_dashboard_preceptores" as any)
@@ -11,12 +12,14 @@ const newFetchData = `      const { data: alocData } = await supabase
 
 code = code.replace(fetchDataRegex, newFetchData);
 
-const filteredAlocRegex = /const passEspecialidade = selectedEspecialidade === \"all\" \|\| a\.especialidade_id === selectedEspecialidade;/;
+const filteredAlocRegex =
+  /const passEspecialidade = selectedEspecialidade === \"all\" \|\| a\.especialidade_id === selectedEspecialidade;/;
 const newFilteredAloc = `const passEspecialidade = selectedEspecialidade === "all" || (a.especialidade_nome && a.especialidade_nome === selectedEspecialidade) || (!a.especialidade_nome && selectedEspecialidade === "null");`;
 
 code = code.replace(filteredAlocRegex, newFilteredAloc);
 
-const kpisRegex = /const \{ totalAlunos, totalPreceptores, totalUnidades, rankingData, especialidadeData, alertasPreceptor, alertasUnidade \} = useMemo\(\(\) => \{[\s\S]*?\}, \[filteredAloc, limitePreceptor, limiteUnidade\]\);/;
+const kpisRegex =
+  /const \{ totalAlunos, totalPreceptores, totalUnidades, rankingData, especialidadeData, alertasPreceptor, alertasUnidade \} = useMemo\(\(\) => \{[\s\S]*?\}, \[filteredAloc, limitePreceptor, limiteUnidade\]\);/;
 
 const newKpis = `  const { totalAlunos, totalPreceptores, totalUnidades, rankingData, especialidadeData, alertasPreceptor, alertasUnidade } = useMemo(() => {
     let totalAlunosSum = 0;
@@ -81,5 +84,5 @@ const newKpis = `  const { totalAlunos, totalPreceptores, totalUnidades, ranking
 
 code = code.replace(kpisRegex, newKpis);
 
-fs.writeFileSync('src/routes/dashboard.tsx', code);
-console.log('Replaced dashboard.tsx');
+fs.writeFileSync("src/routes/dashboard.tsx", code);
+console.log("Replaced dashboard.tsx");

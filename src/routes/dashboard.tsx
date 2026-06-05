@@ -47,7 +47,7 @@ function Stat({
   hint,
   isRatio = false,
 }: {
-  icon: any;
+  icon: React.ElementType;
   value: string | number;
   label: string;
   hint?: string;
@@ -77,8 +77,16 @@ function Stat({
 }
 
 const COLORS = [
-  "#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#10b981",
+  "#22c55e",
+  "#3b82f6",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#ec4899",
+  "#14b8a6",
+  "#f97316",
+  "#6366f1",
+  "#10b981",
 ];
 
 function Dashboard() {
@@ -86,34 +94,32 @@ function Dashboard() {
   const limitePreceptor = config.limitePreceptor;
   const limiteUnidade = config.limiteUnidade;
 
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
   const [selectedUnidade, setSelectedUnidade] = useState<string>("all");
   const [selectedEspecialidade, setSelectedEspecialidade] = useState<string>("all");
   const [selectedPreceptor, setSelectedPreceptor] = useState<string>("all");
 
   const { data: dashboardData, isLoading: loading } = useQuery({
-    queryKey: ['dashboardData'],
+    queryKey: ["dashboardData"],
     queryFn: async () => {
       const [uRes, eRes, pRes] = await Promise.all([
-        supabase.from("unidades").select("id, nome").eq("ativo", true).order("nome"),
-        supabase.from("especialidades").select("id, nome").order("nome"),
-        supabase.from("preceptores").select("id, nome").order("nome"),
+        (supabase.from("unidades" as any).select("id, nome").eq("ativo", true).order("nome")) as unknown as Promise<{ data: any[] | null }>,
+        (supabase.from("especialidades" as any).select("id, nome").order("nome")) as unknown as Promise<{ data: any[] | null }>,
+        (supabase.from("preceptores" as any).select("id, nome").order("nome")) as unknown as Promise<{ data: any[] | null }>,
       ]);
-      
-      const { data: viewData, error } = await supabase
-        .from("vw_dashboard_preceptores")
-        .select("*");
-        
+
+      const { data: viewData, error } = (await supabase.from("vw_dashboard_preceptores" as any).select("*")) as { data: any[] | null; error: any };
+
       if (error) throw error;
-      
+
       return {
         unidades: uRes.data || [],
         especialidades: eRes.data || [],
         preceptores: pRes.data || [],
-        alocacoes: viewData || []
+        alocacoes: viewData || [],
       };
-    }
+    },
   });
 
   const alocacoes = dashboardData?.alocacoes || [];
@@ -126,18 +132,29 @@ function Dashboard() {
   const filteredAloc = useMemo(() => {
     return alocacoes.filter((a) => {
       const passUnidade = selectedUnidade === "all" || a.unidade_id === selectedUnidade;
-      const passEspecialidade = selectedEspecialidade === "all" || (a.especialidade_nome && a.especialidade_nome === selectedEspecialidade) || (!a.especialidade_nome && selectedEspecialidade === "null");
+      const passEspecialidade =
+        selectedEspecialidade === "all" ||
+        (a.especialidade_nome && a.especialidade_nome === selectedEspecialidade) ||
+        (!a.especialidade_nome && selectedEspecialidade === "null");
       const passPreceptor = selectedPreceptor === "all" || a.preceptor_id === selectedPreceptor;
       return passUnidade && passEspecialidade && passPreceptor;
     });
   }, [alocacoes, selectedUnidade, selectedEspecialidade, selectedPreceptor]);
 
   // Calcular KPIs
-    const { totalAlunos, totalPreceptores, totalUnidades, rankingData, especialidadeData, alertasPreceptor, alertasUnidade } = useMemo(() => {
-        const alunosSet = new Set<string>();
+  const {
+    totalAlunos,
+    totalPreceptores,
+    totalUnidades,
+    rankingData,
+    especialidadeData,
+    alertasPreceptor,
+    alertasUnidade,
+  } = useMemo(() => {
+    const alunosSet = new Set<string>();
     const preceptoresSet = new Set<string>();
     const unidadesSet = new Set<string>();
-    
+
     const preceptorMap = new Map<string, { nome: string; count: Set<string> }>();
     const especialidadeMap = new Map<string, Set<string>>();
     const unidadeMap = new Map<string, { nome: string; count: Set<string> }>();
@@ -149,7 +166,10 @@ function Dashboard() {
 
       if (a.preceptor_id) {
         if (!preceptorMap.has(a.preceptor_id)) {
-          preceptorMap.set(a.preceptor_id, { nome: a.preceptor || "Desconhecido", count: new Set() });
+          preceptorMap.set(a.preceptor_id, {
+            nome: a.preceptor || "Desconhecido",
+            count: new Set(),
+          });
         }
         if (a.aluno) preceptorMap.get(a.preceptor_id)!.count.add(a.aluno);
       }
@@ -175,8 +195,12 @@ function Dashboard() {
       .map(([name, set]) => ({ name, value: set.size }))
       .sort((a, b) => b.value - a.value);
 
-    const aPrec = Array.from(preceptorMap.values()).filter(p => p.count.size > limitePreceptor).map(p => ({ nome: p.nome, alunos: p.count.size }));
-    const aUni = Array.from(unidadeMap.values()).filter(u => u.count.size > limiteUnidade).map(u => ({ nome: u.nome, alunos: u.count.size }));
+    const aPrec = Array.from(preceptorMap.values())
+      .filter((p) => p.count.size > limitePreceptor)
+      .map((p) => ({ nome: p.nome, alunos: p.count.size }));
+    const aUni = Array.from(unidadeMap.values())
+      .filter((u) => u.count.size > limiteUnidade)
+      .map((u) => ({ nome: u.nome, alunos: u.count.size }));
 
     return {
       totalAlunos: filteredAloc.length,
@@ -185,18 +209,19 @@ function Dashboard() {
       rankingData: rData,
       especialidadeData: eData,
       alertasPreceptor: aPrec,
-      alertasUnidade: aUni
+      alertasUnidade: aUni,
     };
   }, [filteredAloc, limitePreceptor, limiteUnidade]);
 
-  const mediaAlunosPreceptor = totalPreceptores > 0 ? (totalAlunos / totalPreceptores).toFixed(1) : "0.0";
+  const mediaAlunosPreceptor =
+    totalPreceptores > 0 ? (totalAlunos / totalPreceptores).toFixed(1) : "0.0";
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       {/* ── HEADER & FILTERS ── */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-lg backdrop-blur-sm relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent pointer-events-none" />
-        
+
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-inner">
             <Activity className="h-6 w-6 text-white" />
@@ -219,7 +244,9 @@ function Dashboard() {
             <SelectContent className="max-h-80">
               <SelectItem value="all">Todas as Unidades</SelectItem>
               {unidadesFiltro.map((u) => (
-                <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                <SelectItem key={u.id} value={u.id}>
+                  {u.nome}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -231,7 +258,9 @@ function Dashboard() {
             <SelectContent className="max-h-80">
               <SelectItem value="all">Todas as Especialidades</SelectItem>
               {especialidadesFiltro.map((e) => (
-                <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
+                <SelectItem key={e.id} value={e.id}>
+                  {e.nome}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -243,7 +272,9 @@ function Dashboard() {
             <SelectContent className="max-h-80">
               <SelectItem value="all">Todos os Preceptores</SelectItem>
               {preceptoresFiltro.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                <SelectItem key={p.id} value={p.id}>
+                  {p.nome}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -252,9 +283,13 @@ function Dashboard() {
 
       <div className="flex items-center justify-end gap-2 text-xs text-slate-400 -mt-2 pr-2">
         {loading ? (
-          <span className="flex items-center gap-1.5"><RefreshCw className="h-3 w-3 animate-spin" /> Atualizando...</span>
+          <span className="flex items-center gap-1.5">
+            <RefreshCw className="h-3 w-3 animate-spin" /> Atualizando...
+          </span>
         ) : (
-          <span className="flex items-center gap-1.5 text-emerald-500"><CheckCircle2 className="h-3 w-3" /> Dados Sincronizados</span>
+          <span className="flex items-center gap-1.5 text-emerald-500">
+            <CheckCircle2 className="h-3 w-3" /> Dados Sincronizados
+          </span>
         )}
         <span className="opacity-50">Última atualização: {lastUpdate.toLocaleTimeString()}</span>
       </div>
@@ -263,7 +298,13 @@ function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <Stat icon={Users} value={totalAlunos} label="Alunos" hint="vinculados ativos" />
         <Stat icon={Stethoscope} value={totalPreceptores} label="Preceptores" hint="com vínculos" />
-        <Stat icon={Activity} value={mediaAlunosPreceptor} label="Média" hint="Alunos/Preceptor" isRatio />
+        <Stat
+          icon={Activity}
+          value={mediaAlunosPreceptor}
+          label="Média"
+          hint="Alunos/Preceptor"
+          isRatio
+        />
         <Stat icon={Building2} value={totalUnidades} label="Unidades" hint="com alunos alocados" />
         <Stat icon={Clock} value={horasConcluidas} label="Horas" hint="carga horária da agenda" />
       </div>
@@ -281,13 +322,20 @@ function Dashboard() {
           </CardHeader>
           <CardContent>
             {alertasPreceptor.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">Nenhum preceptor acima do limite.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
+                Nenhum preceptor acima do limite.
+              </p>
             ) : (
               <div className="space-y-2">
                 {alertasPreceptor.map((p, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm p-2 rounded bg-red-900/20">
+                  <div
+                    key={i}
+                    className="flex justify-between items-center text-sm p-2 rounded bg-red-900/20"
+                  >
                     <span className="font-medium text-slate-800 dark:text-slate-200">{p.nome}</span>
-                    <span className="text-red-600 dark:text-red-400 font-bold">{p.alunos} alunos</span>
+                    <span className="text-red-600 dark:text-red-400 font-bold">
+                      {p.alunos} alunos
+                    </span>
                   </div>
                 ))}
               </div>
@@ -300,18 +348,52 @@ function Dashboard() {
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 shadow-md border-white/10 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200">Ranking de Preceptores (Top 10)</CardTitle>
-            <p className="text-xs text-muted-foreground">Distribuição atual de alunos alocados por preceptor</p>
+            <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              Ranking de Preceptores (Top 10)
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Distribuição atual de alunos alocados por preceptor
+            </p>
           </CardHeader>
           <CardContent>
             <div className="h-[300px] w-full">
               <ClientOnly>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={rankingData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" opacity={0.4} />
-                    <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis dataKey="preceptor" type="category" width={150} stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} />
+                  <BarChart
+                    data={rankingData}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      horizontal={false}
+                      stroke="#334155"
+                      opacity={0.4}
+                    />
+                    <XAxis
+                      type="number"
+                      stroke="#64748b"
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      dataKey="preceptor"
+                      type="category"
+                      width={150}
+                      stroke="#64748b"
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                      contentStyle={{
+                        backgroundColor: "#0f172a",
+                        border: "1px solid #1e293b",
+                        borderRadius: "8px",
+                      }}
+                    />
                     <Bar dataKey="alunos" fill="#22c55e" radius={[0, 4, 4, 0]} maxBarSize={40} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -322,19 +404,34 @@ function Dashboard() {
 
         <Card className="shadow-md border-white/10 dark:bg-slate-900/40">
           <CardHeader>
-            <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200">Alunos por Especialidade</CardTitle>
+            <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              Alunos por Especialidade
+            </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center">
             <div className="h-[220px] w-full">
               <ClientOnly>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={especialidadeData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
+                    <Pie
+                      data={especialidadeData}
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
                       {especialidadeData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#0f172a",
+                        border: "1px solid #1e293b",
+                        borderRadius: "8px",
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </ClientOnly>
@@ -342,9 +439,19 @@ function Dashboard() {
             <div className="grid grid-cols-2 gap-x-2 gap-y-1 w-full mt-4">
               {especialidadeData.slice(0, 4).map((entry, index) => (
                 <div key={index} className="flex items-center text-xs">
-                  <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                  <span className="truncate text-slate-600 dark:text-slate-300 flex-1" title={entry.name}>{entry.name}</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-100 ml-1">{entry.value}</span>
+                  <div
+                    className="w-2 h-2 rounded-full mr-2"
+                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                  />
+                  <span
+                    className="truncate text-slate-600 dark:text-slate-300 flex-1"
+                    title={entry.name}
+                  >
+                    {entry.name}
+                  </span>
+                  <span className="font-bold text-slate-800 dark:text-slate-100 ml-1">
+                    {entry.value}
+                  </span>
                 </div>
               ))}
             </div>

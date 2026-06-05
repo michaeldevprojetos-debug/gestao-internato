@@ -1,22 +1,23 @@
-const fs = require('fs');
+const fs = require("fs");
 
-let code = fs.readFileSync('src/routes/hospitais.tsx', 'utf8');
+let code = fs.readFileSync("src/routes/hospitais.tsx", "utf8");
 
 // 1. Replace locais with unidades
 code = code.replace(/\"locais\"/g, '"unidades"');
 code = code.replace(/from\("locais"/g, 'from("unidades"');
-code = code.replace(/public\.locais/g, 'public.unidades');
+code = code.replace(/public\.locais/g, "public.unidades");
 
 // 2. Replace vinculo_operacional with alocacoes in fetchLocais
 code = code.replace(
   /from\("vinculo_operacional"\)[\s\S]*?\.select\("id, preceptor_id, aluno_id, quantidade_alunos, alunos \( nome, semestre \)"\)/,
-  'from("alocacoes").select("id, preceptor_id, aluno_id, unidade_id, alunos ( nome, semestre )")'
+  'from("alocacoes").select("id, preceptor_id, aluno_id, unidade_id, alunos ( nome, semestre )")',
 );
 // Also in handleUpdateQuantidade if it's there
 code = code.replace(/from\("vinculo_operacional"\)/g, 'from("alocacoes")');
 
 // 3. Fix the loop that builds the sets for preceptores and students
-const loopStart = /const preceptorQtd = new Map<string, VinculoQtd>\(\);[\s\S]*?for \(const v of vinculosData \?\? \[\]\) \{/;
+const loopStart =
+  /const preceptorQtd = new Map<string, VinculoQtd>\(\);[\s\S]*?for \(const v of vinculosData \?\? \[\]\) \{/;
 
 // We need to build the counts from alocacoes correctly.
 // A preceptor is linked to a unit if there is an allocation linking them.
@@ -85,15 +86,19 @@ code = code.replace(mapRegex, newMapCode);
 // But in the new schema, preceptores are bound via alocacoes (unidade_id)
 // Wait, the user's preceptores table still has NO local_id!
 // Let's filter preceptoresDoLocal based on preceptorUnits map!
-const precListRegex = /const preceptoresDoLocal = \(preceptoresData \?\? \[\]\)\.filter\(\s*\(\(p\): any => p\.local_id === loc\.id\) \|\| \(\(p\) => p\.local_id === loc\.id\)\s*\);/;
+const precListRegex =
+  /const preceptoresDoLocal = \(preceptoresData \?\? \[\]\)\.filter\(\s*\(\(p\): any => p\.local_id === loc\.id\) \|\| \(\(p\) => p\.local_id === loc\.id\)\s*\);/;
 // Wait, let's just replace it safely:
-const searchStr = 'const preceptoresDoLocal = (preceptoresData ?? []).filter(';
+const searchStr = "const preceptoresDoLocal = (preceptoresData ?? []).filter(";
 const precListCode = `const preceptoresDoLocal = (preceptoresData ?? []).filter(
           (p) => preceptorUnits.get(p.id)?.has(loc.id)
         );`;
 
 // Find where preceptoresDoLocal is defined and replace it
-code = code.replace(/const preceptoresDoLocal = \(preceptoresData \?\? \[\]\)\.filter\([\s\S]*?p\.local_id === loc\.id\s*\);/, precListCode);
+code = code.replace(
+  /const preceptoresDoLocal = \(preceptoresData \?\? \[\]\)\.filter\([\s\S]*?p\.local_id === loc\.id\s*\);/,
+  precListCode,
+);
 
 // 6. Fix "Em outra unidade" badge in Modal
 // The badge is currently shown if p.local_id && p.local_id !== local?.id
@@ -105,9 +110,15 @@ const newBadgeCode = `
     const isEmOutraUnidade = false; // Disable badge initially, or we can fetch it dynamically.
     // Wait, let's just set it to false for now, as checking it requires preceptorUnits which is inside fetchLocais.
 `;
-// Let's just remove the p.local_id checks. 
-code = code.replace(/const isEmOutraUnidade = p\.local_id && local\? \?\? p\.local_id !== local\?\.id;/g, 'const isEmOutraUnidade = false;');
-code = code.replace(/const isEmOutraUnidade = p\.local_id && local && p\.local_id !== local\.id;/g, 'const isEmOutraUnidade = false;');
+// Let's just remove the p.local_id checks.
+code = code.replace(
+  /const isEmOutraUnidade = p\.local_id && local\? \?\? p\.local_id !== local\?\.id;/g,
+  "const isEmOutraUnidade = false;",
+);
+code = code.replace(
+  /const isEmOutraUnidade = p\.local_id && local && p\.local_id !== local\.id;/g,
+  "const isEmOutraUnidade = false;",
+);
 
-fs.writeFileSync('src/routes/hospitais.tsx', code);
-console.log('Fixed hospitais schema issues');
+fs.writeFileSync("src/routes/hospitais.tsx", code);
+console.log("Fixed hospitais schema issues");

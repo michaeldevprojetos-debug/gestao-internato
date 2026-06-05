@@ -38,7 +38,7 @@ export function useSystemConfig() {
 
       if (data && Array.isArray(data) && data.length > 0) {
         const map: Record<string, string> = {};
-        for (const row of data as { chave: string; valor: string }[]) {
+        for (const row of data as unknown as { chave: string; valor: string }[]) {
           map[row.chave] = row.valor;
         }
 
@@ -88,10 +88,10 @@ export function useSystemConfig() {
   const updateLimitePreceptor = useCallback(async (value: number) => {
     setConfig((prev) => ({ ...prev, limitePreceptor: value }));
 
-    const { error } = await supabase
-      .from("configuracoes_sistema" as any)
-      .update({ valor: value.toString() } as any)
-      .eq("chave" as any, "limite_alunos_preceptor");
+    const { error } = await (supabase as any)
+      .from("configuracoes_sistema")
+      .update({ valor: value.toString() })
+      .eq("chave", "limite_alunos_preceptor");
 
     if (error) {
       console.error("[useSystemConfig] Erro ao salvar limite_alunos_preceptor:", error.message);
@@ -101,10 +101,10 @@ export function useSystemConfig() {
   const updateLimiteUnidade = useCallback(async (value: number) => {
     setConfig((prev) => ({ ...prev, limiteUnidade: value }));
 
-    const { error } = await supabase
-      .from("configuracoes_sistema" as any)
-      .update({ valor: value.toString() } as any)
-      .eq("chave" as any, "limite_alunos_unidade");
+    const { error } = await (supabase as any)
+      .from("configuracoes_sistema")
+      .update({ valor: value.toString() })
+      .eq("chave", "limite_alunos_unidade");
 
     if (error) {
       console.error("[useSystemConfig] Erro ao salvar limite_alunos_unidade:", error.message);

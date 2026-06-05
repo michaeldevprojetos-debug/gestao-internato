@@ -173,28 +173,26 @@ function HospitaisPage() {
     setError(null);
     try {
       // 1. Todos os locais cadastrados
-      const { data: locaisData, error: err1 } = await supabase
-        .from("unidades")
+      const { data: locaisData, error: err1 } = (await supabase
+        .from("unidades" as any)
         .select("id, nome, tipo")
-        .order("nome");
+        .order("nome")) as { data: any[] | null; error: any };
       if (err1) throw err1;
 
       setAllLocaisSimple((locaisData ?? []) as LocalSimple[]);
 
       // 2. Todos os preceptores
-      const { data: preceptoresData, error: err2 } = await supabase
-        .from("preceptores")
+      const { data: preceptoresData, error: err2 } = (await supabase
+        .from("preceptores" as any)
         .select("id, nome, especialidade, local_id")
-        .order("nome");
+        .order("nome")) as { data: any[] | null; error: any };
       if (err2) throw err2;
 
-      
-
       // 3. Todos os alunos
-      const { data: alunosData, error: errAlunos } = await supabase
-        .from("alunos")
+      const { data: alunosData, error: errAlunos } = (await supabase
+        .from("alunos" as any)
         .select("id, nome, semestre")
-        .order("nome");
+        .order("nome")) as { data: any[] | null; error: any };
       if (errAlunos) throw errAlunos;
 
       setAllAlunos(
@@ -206,8 +204,9 @@ function HospitaisPage() {
       );
 
       // 4. Vínculos operacionais
-      const { data: vinculosData, error: err3 } = await supabase
-        .from("alocacoes").select("id, preceptor_id, aluno_id, unidade_id, alunos ( nome, semestre )");
+      const { data: vinculosData, error: err3 } = (await supabase
+        .from("alocacoes" as any)
+        .select("id, preceptor_id, aluno_id, unidade_id, alunos ( nome, semestre )")) as { data: any[] | null; error: any };
       if (err3) throw err3;
 
       type AlunoInfo = { id: string; nome: string; semestre: number | null };
@@ -321,13 +320,13 @@ function HospitaisPage() {
         .eq("local_id", localId);
       if (err1) throw err1;
 
-      const { error: err2 } = await supabase.from("unidades").delete().eq("id", localId);
+      const { error: err2 } = await supabase.from("unidades" as any).delete().eq("id", localId);
       if (err2) throw err2;
 
       toast.success(`Unidade "${localNome}" excluída com sucesso!`);
       fetchLocais();
-      queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
-      queryClient.invalidateQueries({ queryKey: ['alocacoes'] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
+      queryClient.invalidateQueries({ queryKey: ["alocacoes"] });
     } catch (e: any) {
       toast.error("Erro ao excluir: " + (e?.message ?? "Tente novamente."));
     }
@@ -342,12 +341,12 @@ function HospitaisPage() {
     try {
       if (vinculoId) {
         const { error } = await supabase
-          .from("alocacoes")
+          .from("alocacoes" as any)
           .update({ quantidade_alunos: newValue })
           .eq("id", vinculoId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("alocacoes").insert({
+        const { error } = await supabase.from("alocacoes" as any).insert({
           preceptor_id: preceptorId,
           quantidade_alunos: newValue,
           mes_referencia: new Date().toISOString().slice(0, 7),
@@ -666,8 +665,8 @@ function HospitaisPage() {
         onSaved={() => {
           setDialogOpen(false);
           fetchLocais();
-          queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
-          queryClient.invalidateQueries({ queryKey: ['alocacoes'] });
+          queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
+          queryClient.invalidateQueries({ queryKey: ["alocacoes"] });
         }}
       />
     </div>
@@ -739,7 +738,11 @@ function PreceptorCard({
           {students.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {students.map((s, idx) => (
-                <Badge key={idx} variant="outline" className="text-[10px] bg-slate-100 dark:bg-slate-800">
+                <Badge
+                  key={idx}
+                  variant="outline"
+                  className="text-[10px] bg-slate-100 dark:bg-slate-800"
+                >
                   {s.aluno_nome}
                 </Badge>
               ))}
@@ -1066,7 +1069,7 @@ function GerenciarUnidadeDialog({
   const [preceptoresOptions, setPreceptoresOptions] = useState<PreceptorSimple[]>([]);
   // Per-preceptor student selections: Map<preceptorKey, string[]>
   const [preceptorAlunos, setPreceptorAlunos] = useState<Record<string, string[]>>({});
-  
+
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [horaInicio, setHoraInicio] = useState("08:00");
@@ -1223,36 +1226,40 @@ function GerenciarUnidadeDialog({
       toast.warning("Informe o nome da unidade.");
       return;
     }
-    
+
     // --- INÍCIO VALIDAÇÃO ANTI-CONFLITO ---
-    const allSelectedStudentIds = Array.from(new Set(
-      selectedPreceptores.flatMap(tag => {
-        const key = tag.type === "existing" ? tag.id : tag.tempId;
-        return preceptorAlunos[key] ?? [];
-      })
-    ));
+    const allSelectedStudentIds = Array.from(
+      new Set(
+        selectedPreceptores.flatMap((tag) => {
+          const key = tag.type === "existing" ? tag.id : tag.tempId;
+          return preceptorAlunos[key] ?? [];
+        }),
+      ),
+    );
 
     if (allSelectedStudentIds.length > 0) {
       const { data: existingAlocacoes, error: fetchErr } = await supabase
-        .from("alocacoes")
-        .select("id, aluno_id, unidade_id, preceptor_id, especialidade_id, data_inicio, data_fim, hora_inicio, hora_fim")
+        .from("alocacoes" as any)
+        .select(
+          "id, aluno_id, unidade_id, preceptor_id, especialidade_id, data_inicio, data_fim, hora_inicio, hora_fim",
+        )
         .in("aluno_id", allSelectedStudentIds);
 
       if (!fetchErr && existingAlocacoes) {
         const newStart = new Date(dataInicio || new Date().toISOString().split("T")[0]);
         const newEnd = dataFim ? new Date(dataFim) : new Date("2099-12-31");
-        
+
         const nHI = horaInicio || "00:00";
         const nHF = horaFim || "23:59";
 
-        for (const ext of existingAlocacoes) {
+        for (const ext of (existingAlocacoes || []) as any[]) {
           // Ignorar se estiver editando a própria unidade e sobrescrevendo,
           // mas wait, o usuário disse: Se a unidade for DIFERENTE, barra. Se for a MESMA, permite se preceptor+esp for diferente.
           // Na verdade, the user says if it's the SAME unidade but different preceptor/especialidade it is allowed (internal rotation).
-          
+
           const extStart = new Date(ext.data_inicio);
           const extEnd = ext.data_fim ? new Date(ext.data_fim) : new Date("2099-12-31");
-          
+
           const eHI = ext.hora_inicio || "00:00";
           const eHF = ext.hora_fim || "23:59";
 
@@ -1261,13 +1268,15 @@ function GerenciarUnidadeDialog({
 
           if (datesOverlap && timesOverlap) {
             // Conflito de tempo detectado para o aluno ext.aluno_id
-            
-            // Qual unidade atual estamos salvando? 
+
+            // Qual unidade atual estamos salvando?
             // isNew ? não temos localId ainda, mas a lógica exige comparar
-            const savingLocalId = local?.id; 
+            const savingLocalId = local?.id;
 
             if (ext.unidade_id !== savingLocalId) {
-              toast.error("Conflito: Este aluno já está alocado em outra unidade neste mesmo dia e horário!");
+              toast.error(
+                "Conflito: Este aluno já está alocado em outra unidade neste mesmo dia e horário!",
+              );
               return;
             } else {
               // Mesma unidade. Verificar preceptor e especialidade
@@ -1275,20 +1284,24 @@ function GerenciarUnidadeDialog({
               // The user said: "PERMITA o salvamento apenas se o Preceptor e a Especialidade forem diferentes"
               // Qual preceptor estamos tentando salvar para esse aluno?
               // Check the tag that contains this student:
-              const tagOfStudent = selectedPreceptores.find(tag => {
+              const tagOfStudent = selectedPreceptores.find((tag) => {
                 const key = tag.type === "existing" ? tag.id : tag.tempId;
                 return (preceptorAlunos[key] ?? []).includes(ext.aluno_id);
               });
-              
+
               if (tagOfStudent) {
-                const realPreceptorId = tagOfStudent.type === "existing" ? tagOfStudent.id : "NEW_PRECEPTOR";
+                const realPreceptorId =
+                  tagOfStudent.type === "existing" ? tagOfStudent.id : "NEW_PRECEPTOR";
                 const isSamePreceptor = realPreceptorId === ext.preceptor_id;
                 // Since finalEspecialidade is set below, let's just grab the current especialidade being saved.
-                const currentEspecialidade = especialidade === "Outra" ? especialidadeCustom.trim() : especialidade;
+                const currentEspecialidade =
+                  especialidade === "Outra" ? especialidadeCustom.trim() : especialidade;
                 // Wait, if it's a NEW preceptor, realPreceptorId is definitely different from ext.preceptor_id
                 // But the user specifies: "apenas se o Preceptor e a Especialidade forem diferentes".
                 if (isSamePreceptor) {
-                  toast.error("Conflito: Este aluno já possui alocação para este preceptor no mesmo horário!");
+                  toast.error(
+                    "Conflito: Este aluno já possui alocação para este preceptor no mesmo horário!",
+                  );
                   return;
                 }
               }
@@ -1301,7 +1314,7 @@ function GerenciarUnidadeDialog({
 
     setSaving(true);
     try {
-      let localId = local?.id;
+      let localId: string = local?.id ?? "";
       const finalEspecialidade =
         especialidade === "Outra" ? especialidadeCustom.trim() : especialidade;
 
@@ -1312,23 +1325,22 @@ function GerenciarUnidadeDialog({
 
       if (isNew) {
         if (matchedLocal) {
-          // Local já existe, usar o ID existente e atualizar tipo se necessário
           localId = matchedLocal.id;
-          const { error } = await supabase.from("unidades").update({ tipo }).eq("id", localId);
+          const { error } = await supabase.from("unidades" as any).update({ tipo }).eq("id", localId);
           if (error) throw error;
         } else {
           // Criar novo local
-          const { data, error } = await supabase
-            .from("unidades")
+          const { data, error } = (await supabase
+            .from("unidades" as any)
             .insert({ nome: nome.trim(), tipo })
             .select("id")
-            .single();
+            .single()) as { data: any; error: any };
           if (error) throw error;
           localId = data.id;
         }
       } else {
         const { error } = await supabase
-          .from("unidades")
+          .from("unidades" as any)
           .update({ nome: nome.trim(), tipo })
           .eq("id", local!.id);
         if (error) throw error;
@@ -1364,14 +1376,14 @@ function GerenciarUnidadeDialog({
 
       if (allSelectedIds.length > 0) {
         const { error } = await supabase
-          .from("preceptores")
+          .from("preceptores" as any)
           .update({ local_id: localId })
           .in("id", allSelectedIds);
         if (error) throw error;
 
         if (finalEspecialidade && existingIds.length > 0) {
           const { error: errEsp } = await supabase
-            .from("preceptores")
+            .from("preceptores" as any)
             .update({ especialidade: finalEspecialidade })
             .in("id", existingIds);
           if (errEsp) throw errEsp;
@@ -1382,14 +1394,14 @@ function GerenciarUnidadeDialog({
       if (local && local.preceptoresList.length > 0) {
         const preceptorIdsOfLocal = local.preceptoresList.map((p) => p.id);
         const { error: deleteError } = await supabase
-          .from("alocacoes")
+          .from("alocacoes" as any)
           .delete()
           .in("preceptor_id", preceptorIdsOfLocal);
         if (deleteError) throw deleteError;
 
         // Desvincular alunos cujo preceptor_id atual pertencia a esta unidade
         const { error: unsetError } = await supabase
-          .from("alunos")
+          .from("alunos" as any)
           .update({ preceptor_id: null })
           .in("preceptor_id", preceptorIdsOfLocal);
         if (unsetError) throw unsetError;
@@ -1421,25 +1433,27 @@ function GerenciarUnidadeDialog({
               data_inicio: dataInicio || new Date().toISOString().split("T")[0],
               data_fim: dataFim || null,
               hora_inicio: horaInicio || null,
-              hora_fim: horaFim || null
+              hora_fim: horaFim || null,
             });
           }
         } else {
-            alocacoesToInsert.push({
-              preceptor_id: realPreceptorId,
-              aluno_id: null,
-              unidade_id: localId,
-              data_inicio: dataInicio || new Date().toISOString().split("T")[0],
-              data_fim: dataFim || null,
-              hora_inicio: horaInicio || null,
-              hora_fim: horaFim || null
-            });
+          alocacoesToInsert.push({
+            preceptor_id: realPreceptorId,
+            aluno_id: null,
+            unidade_id: localId,
+            data_inicio: dataInicio || new Date().toISOString().split("T")[0],
+            data_fim: dataFim || null,
+            hora_inicio: horaInicio || null,
+            hora_fim: horaFim || null,
+          });
         }
       }
 
       if (alocacoesToInsert.length > 0) {
-        const { error } = await supabase.from("alocacoes").insert(alocacoesToInsert);
-        if (error) throw error;
+        const { error: alocError } = await supabase
+          .from("alocacoes" as any)
+          .insert(alocacoesToInsert);
+        if (alocError) throw alocError;
       }
 
       // ── UPDATE alunos.preceptor_id para refletir a vinculação ──
@@ -1560,7 +1574,8 @@ function GerenciarUnidadeDialog({
                 visiblePreceptores.slice(0, 50).map((p) => {
                   const checked = isSelected(p.id);
                   // Se o preceptor tem vínculos (preceptorUnits.get(p.id)) e algum deles não é a unidade atual
-                  const otherLocal = p.units && p.units.length > 0 && p.units.some(uId => uId !== local?.id);
+                  const otherLocal =
+                    p.units && p.units.length > 0 && p.units.some((uId) => uId !== local?.id);
 
                   return (
                     <div
@@ -1710,19 +1725,39 @@ function GerenciarUnidadeDialog({
           <div className="grid grid-cols-2 gap-3 pt-4 border-t">
             <div className="grid gap-2">
               <Label>Data Início</Label>
-              <Input type="date" className="bg-background text-foreground border-input focus:ring-ring" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+              <Input
+                type="date"
+                className="bg-background text-foreground border-input focus:ring-ring"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+              />
             </div>
             <div className="grid gap-2">
               <Label>Data Fim</Label>
-              <Input type="date" className="bg-background text-foreground border-input focus:ring-ring" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+              <Input
+                type="date"
+                className="bg-background text-foreground border-input focus:ring-ring"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+              />
             </div>
             <div className="grid gap-2">
               <Label>Hora Início</Label>
-              <Input type="time" className="bg-background text-foreground border-input focus:ring-ring" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+              <Input
+                type="time"
+                className="bg-background text-foreground border-input focus:ring-ring"
+                value={horaInicio}
+                onChange={(e) => setHoraInicio(e.target.value)}
+              />
             </div>
             <div className="grid gap-2">
               <Label>Hora Fim</Label>
-              <Input type="time" className="bg-background text-foreground border-input focus:ring-ring" value={horaFim} onChange={(e) => setHoraFim(e.target.value)} />
+              <Input
+                type="time"
+                className="bg-background text-foreground border-input focus:ring-ring"
+                value={horaFim}
+                onChange={(e) => setHoraFim(e.target.value)}
+              />
             </div>
           </div>
         </div>

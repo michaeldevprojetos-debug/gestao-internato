@@ -1,22 +1,22 @@
-const fs = require('fs');
-let code = fs.readFileSync('src/routes/hospitais.tsx', 'utf8');
+const fs = require("fs");
+let code = fs.readFileSync("src/routes/hospitais.tsx", "utf8");
 
 // 1. Add classNames to Date/Time inputs
 code = code.replace(
   /<Input type="date" value=\{dataInicio\}/g,
-  '<Input type="date" className="bg-background text-foreground border-input focus:ring-ring" value={dataInicio}'
+  '<Input type="date" className="bg-background text-foreground border-input focus:ring-ring" value={dataInicio}',
 );
 code = code.replace(
   /<Input type="date" value=\{dataFim\}/g,
-  '<Input type="date" className="bg-background text-foreground border-input focus:ring-ring" value={dataFim}'
+  '<Input type="date" className="bg-background text-foreground border-input focus:ring-ring" value={dataFim}',
 );
 code = code.replace(
   /<Input type="time" value=\{horaInicio\}/g,
-  '<Input type="time" className="bg-background text-foreground border-input focus:ring-ring" value={horaInicio}'
+  '<Input type="time" className="bg-background text-foreground border-input focus:ring-ring" value={horaInicio}',
 );
 code = code.replace(
   /<Input type="time" value=\{horaFim\}/g,
-  '<Input type="time" className="bg-background text-foreground border-input focus:ring-ring" value={horaFim}'
+  '<Input type="time" className="bg-background text-foreground border-input focus:ring-ring" value={horaFim}',
 );
 
 // 2. Add validation logic inside handleSave
@@ -107,5 +107,5 @@ const validationCode = `async function handleSave() {
 
 code = code.replace(handleSaveStartRegex, validationCode);
 
-fs.writeFileSync('src/routes/hospitais.tsx', code);
-console.log('Done hospitais.tsx updates');
+fs.writeFileSync("src/routes/hospitais.tsx", code);
+console.log("Done hospitais.tsx updates");
