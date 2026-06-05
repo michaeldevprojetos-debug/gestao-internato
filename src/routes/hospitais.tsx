@@ -1151,6 +1151,12 @@ function GerenciarUnidadeDialog({
       });
     }, []);
 
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+  const [horaInicio, setHoraInicio] = useState("08:00");
+  const [horaFim, setHoraFim] = useState("12:00");
+
+
     // Cálculo automático de CH Prevista
     useEffect(() => {
       if (!dataInicio || !dataFim || !horaInicio || !horaFim) return;
@@ -1186,10 +1192,6 @@ function GerenciarUnidadeDialog({
       }
     }, [dataInicio, dataFim, horaInicio, horaFim, selectedPreceptores]);
 
-  const [dataInicio, setDataInicio] = useState("");
-  const [dataFim, setDataFim] = useState("");
-  const [horaInicio, setHoraInicio] = useState("08:00");
-  const [horaFim, setHoraFim] = useState("12:00");
 
   // Carregar preceptores diretamente no modal ao abrir
   useEffect(() => {
