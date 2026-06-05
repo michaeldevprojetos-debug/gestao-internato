@@ -1962,7 +1962,7 @@ function GerenciarUnidadeDialog({
                         </div>
                         <div className="grid gap-1.5">
                           <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">CH Prevista</Label>
-                          <Input type="number" min={0} className="h-8 text-xs" value={preceptorChPrevista[key] || ""} onChange={(e) => setPreceptorChPrevista(p => ({...p, [key]: e.target.value ? Number(e.target.value) : ""}))} />
+                          <Input type="number" min={0} className="h-8 text-xs bg-muted/50 cursor-not-allowed" readOnly value={preceptorChPrevista[key] || ""} title="Calculado automaticamente a partir das datas e horas" />
                         </div>
                         <div className="grid gap-1.5">
                           <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">H. Realizadas</Label>
