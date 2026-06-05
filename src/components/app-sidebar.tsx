@@ -30,11 +30,10 @@ import { useAuth } from "@/lib/auth";
 
 const baseItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Agenda", url: "/agenda", icon: CalendarDays },
   { title: "Preceptores", url: "/preceptores", icon: Stethoscope },
   { title: "Alunos", url: "/alunos", icon: GraduationCap },
-  { title: "Alocações", url: "/vinculos", icon: Users },
-  { title: "Unidades", url: "/hospitais", icon: Building2 },
+  { title: "Hospitais / Unidades", url: "/hospitais", icon: Building2 },
+  { title: "Agenda", url: "/agenda", icon: CalendarDays },
   { title: "Atividades", url: "/atividades", icon: ClipboardList },
   { title: "Carga Horária", url: "/carga-horaria", icon: Clock },
   { title: "Relatórios", url: "/relatorios", icon: FileBarChart2 },

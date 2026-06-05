@@ -105,11 +105,10 @@ function Dashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Carregar listas para os filtros
       const [uRes, eRes, pRes] = await Promise.all([
-        supabase.from("unidades" as any).select("id, nome").order("nome"),
+        supabase.from("unidades" as any).select("id, nome").eq("ativo", true).order("nome"),
         supabase.from("especialidades" as any).select("id, nome").order("nome"),
-        supabase.from("preceptores" as any).select("id, nome").order("nome"),
+        supabase.from("preceptores" as any).select("id, nome").eq("ativo", true).order("nome"),
       ]);
       if (uRes.data) setUnidadesFiltro(uRes.data);
       if (eRes.data) setEspecialidadesFiltro(eRes.data);
@@ -125,19 +124,22 @@ function Dashboard() {
           preceptor_id,
           unidade_id,
           especialidade_id,
-          preceptores(nome),
+          alunos!inner(nome, status),
+          preceptores!inner(nome, ativo),
           unidades(nome),
           especialidades(nome)
         `)
+        .eq("alunos.status", "Ativo")
+        .eq("preceptores.ativo", true)
         .or(`data_fim.is.null,data_fim.gte.${hoje}`);
       
       setAlocacoes(alocData || []);
 
-      // 3. Carregar Horas Concluídas da Agenda
+      // 3. Carregar Horas da Agenda
       const { data: agendaData } = await supabase
         .from("agenda_preceptoria" as any)
         .select("hora_inicio, hora_fim")
-        .eq("status", "concluído");
+        .in("status", ["ativo", "concluído"]);
 
       let totalHoras = 0;
       if (agendaData) {

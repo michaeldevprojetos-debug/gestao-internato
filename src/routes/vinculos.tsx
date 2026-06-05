@@ -264,7 +264,7 @@ function AlocacaoDialog({
 
       // Manual overlap check against existing rows since PostgREST OR syntax can be tricky with dates
       if (overlaps && overlaps.length > 0) {
-        const { data: fullOverlaps } = await supabase.from("alocacoes" as any).select("id, data_inicio, data_fim").in("id", overlaps.map((o: any) => o.id));
+        const { data: fullOverlaps } = await supabase.from("alocacoes" as any).select("id, data_inicio, data_fim, preceptor_id, preceptores(nome)").in("id", overlaps.map((o: any) => o.id));
         
         for (const o of (fullOverlaps || [])) {
            const oIni = new Date(o.data_inicio).getTime();
@@ -272,7 +272,8 @@ function AlocacaoDialog({
            
            // Se inicio1 <= fim2 E fim1 >= inicio2 -> CHOQUE!
            if (dIni <= oFim && dFim >= oIni) {
-             toast.error("Aluno já possui preceptor alocado neste período.", { duration: 5000 });
+             const preceptorName = o.preceptores?.nome || "outro preceptor";
+             toast.error(`Este aluno já está vinculado ao preceptor ${preceptorName}.`, { duration: 5000 });
              setSaving(false);
              return;
            }

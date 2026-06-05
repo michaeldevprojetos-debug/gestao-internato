@@ -58,10 +58,7 @@ type AgendaEvent = {
 
 function AgendaPage() {
   const [events, setEvents] = useState<AgendaEvent[]>([]);
-  const [alunos, setAlunos] = useState<any[]>([]);
-  const [preceptores, setPreceptores] = useState<any[]>([]);
-  const [unidades, setUnidades] = useState<any[]>([]);
-  const [especialidades, setEspecialidades] = useState<any[]>([]);
+  const [alocacoes, setAlocacoes] = useState<any[]>([]);
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<AgendaEvent | null>(null);
@@ -104,17 +101,15 @@ function AgendaPage() {
 
   useEffect(() => {
     fetchAgenda();
-    Promise.all([
-      supabase.from("alunos").select("id, nome").eq("status", "Ativo").order("nome"),
-      supabase.from("preceptores" as any).select("id, nome").order("nome"),
-      supabase.from("unidades" as any).select("id, nome").order("nome"),
-      supabase.from("especialidades" as any).select("id, nome").order("nome"),
-    ]).then(([a, p, u, e]) => {
-      if (!a.error) setAlunos(a.data ?? []);
-      if (!p.error) setPreceptores(p.data ?? []);
-      if (!u.error) setUnidades(u.data ?? []);
-      if (!e.error) setEspecialidades(e.data ?? []);
-    });
+    const hoje = new Date().toISOString().split("T")[0];
+    supabase
+      .from("alocacoes" as any)
+      .select(`
+        id, aluno_id, preceptor_id, unidade_id, especialidade_id,
+        alunos(nome), preceptores(nome), unidades(nome), especialidades(nome)
+      `)
+      .or(`data_fim.is.null,data_fim.gte.${hoje}`)
+      .then(({ data }) => setAlocacoes(data || []));
 
     const subscription = supabase
       .channel("agenda_changes")
@@ -191,10 +186,7 @@ function AgendaPage() {
         onOpenChange={setDialogOpen}
         event={selectedEvent}
         initialDate={selectedDate}
-        alunos={alunos}
-        preceptores={preceptores}
-        unidades={unidades}
-        especialidades={especialidades}
+        alocacoes={alocacoes}
         onSaved={fetchAgenda}
       />
     </div>
@@ -202,17 +194,14 @@ function AgendaPage() {
 }
 
 function AgendaDialog({
-  open, onOpenChange, event, initialDate, alunos, preceptores, unidades, especialidades, onSaved
+  open, onOpenChange, event, initialDate, alocacoes, onSaved
 }: {
   open: boolean; onOpenChange: (o: boolean) => void; event: AgendaEvent | null; initialDate: Date | null;
-  alunos: any[]; preceptores: any[]; unidades: any[]; especialidades: any[]; onSaved: () => void;
+  alocacoes: any[]; onSaved: () => void;
 }) {
   const isEdit = !!event;
   const [saving, setSaving] = useState(false);
-  const [alunoId, setAlunoId] = useState("");
-  const [preceptorId, setPreceptorId] = useState("");
-  const [unidadeId, setUnidadeId] = useState("");
-  const [especialidadeId, setEspecialidadeId] = useState("none");
+  const [alocacaoId, setAlocacaoId] = useState("");
   const [dataStr, setDataStr] = useState("");
   const [horaInicio, setHoraInicio] = useState("08:00");
   const [horaFim, setHoraFim] = useState("12:00");
@@ -220,13 +209,15 @@ function AgendaDialog({
 
   useEffect(() => {
     if (open) {
-      setAlunoId(event?.aluno_id ?? "");
-      setPreceptorId(event?.preceptor_id ?? "");
-      setUnidadeId(event?.unidade_id ?? "");
-      setEspecialidadeId(event?.especialidade_id ?? "none");
       setStatus(event?.status ?? "ativo");
       
       if (event) {
+        // Encontrar a alocação que corresponde a este evento
+        const match = alocacoes.find(
+          (a) => a.aluno_id === event.aluno_id && a.preceptor_id === event.preceptor_id && a.unidade_id === event.unidade_id
+        );
+        if (match) setAlocacaoId(match.id);
+        else setAlocacaoId("");
         setDataStr(format(event.start, "yyyy-MM-dd"));
         setHoraInicio(format(event.start, "HH:mm"));
         setHoraFim(format(event.end, "HH:mm"));
@@ -239,18 +230,21 @@ function AgendaDialog({
   }, [open, event, initialDate]);
 
   async function handleSave() {
-    if (!alunoId || !preceptorId || !unidadeId || !dataStr || !horaInicio || !horaFim) {
-      toast.warning("Preencha todos os campos obrigatórios.");
+    if (!alocacaoId || !dataStr || !horaInicio || !horaFim) {
+      toast.warning("Selecione o vínculo e preencha as datas e horários.");
       return;
     }
+
+    const alocacao = alocacoes.find((a) => a.id === alocacaoId);
+    if (!alocacao) return;
 
     setSaving(true);
     try {
       const payload = {
-        aluno_id: alunoId,
-        preceptor_id: preceptorId,
-        unidade_id: unidadeId,
-        especialidade_id: especialidadeId === "none" ? null : especialidadeId,
+        aluno_id: alocacao.aluno_id,
+        preceptor_id: alocacao.preceptor_id,
+        unidade_id: alocacao.unidade_id,
+        especialidade_id: alocacao.especialidade_id,
         data: dataStr,
         hora_inicio: horaInicio,
         hora_fim: horaFim,
@@ -296,41 +290,18 @@ function AgendaDialog({
         </DialogHeader>
         <div className="grid gap-4 py-2 max-h-[70vh] overflow-y-auto">
           <div className="grid gap-2">
-            <Label>Aluno *</Label>
-            <Select value={alunoId} onValueChange={setAlunoId}>
-              <SelectTrigger><SelectValue placeholder="Selecione o aluno" /></SelectTrigger>
+            <Label>Vínculo Ativo *</Label>
+            <Select value={alocacaoId} onValueChange={setAlocacaoId} disabled={isEdit}>
+              <SelectTrigger><SelectValue placeholder="Selecione o vínculo (Aluno → Preceptor)" /></SelectTrigger>
               <SelectContent>
-                {alunos.map((a) => <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>)}
+                {alocacoes.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.alunos?.nome} c/ {a.preceptores?.nome} ({a.unidades?.nome})
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Preceptor *</Label>
-            <Select value={preceptorId} onValueChange={setPreceptorId}>
-              <SelectTrigger><SelectValue placeholder="Selecione o preceptor" /></SelectTrigger>
-              <SelectContent>
-                {preceptores.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Unidade *</Label>
-            <Select value={unidadeId} onValueChange={setUnidadeId}>
-              <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
-              <SelectContent>
-                {unidades.map((u) => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Especialidade</Label>
-            <Select value={especialidadeId} onValueChange={setEspecialidadeId}>
-              <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhuma</SelectItem>
-                {especialidades.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            {isEdit && <p className="text-[10px] text-muted-foreground">O vínculo não pode ser alterado após a criação.</p>}
           </div>
           
           <div className="grid gap-2">
