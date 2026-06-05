@@ -77,16 +77,16 @@ function Stat({
 }
 
 const COLORS = [
-  "#22c55e",
-  "#3b82f6",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
-  "#14b8a6",
-  "#f97316",
-  "#6366f1",
-  "#10b981",
+  "#0ea5e9", // Azul safira/oceano
+  "#10b981", // Verde hospitalar
+  "#3b82f6", // Azul royal
+  "#14b8a6", // Turquesa
+  "#64748b", // Grafite suave
+  "#06b6d4", // Ciano
+  "#22c55e", // Verde claro
+  "#334155", // Grafite escuro
+  "#6366f1", // Índigo
+  "#475569", // Slate
 ];
 
 function Dashboard() {
@@ -135,7 +135,8 @@ function Dashboard() {
       const passEspecialidade =
         selectedEspecialidade === "all" ||
         (a.especialidade_id && a.especialidade_id === selectedEspecialidade) ||
-        (!a.especialidade_id && selectedEspecialidade === "null");
+        (!a.especialidade_id && selectedEspecialidade === "null") ||
+        (a.especialidade && a.especialidade === especialidadesFiltro.find(e => e.id === selectedEspecialidade)?.nome);
       const passPreceptor = selectedPreceptor === "all" || a.preceptor_id === selectedPreceptor;
       return passUnidade && passEspecialidade && passPreceptor;
     });
@@ -155,7 +156,7 @@ function Dashboard() {
     const preceptoresSet = new Set<string>();
     const unidadesSet = new Set<string>();
 
-    const preceptorMap = new Map<string, { nome: string; count: Set<string> }>();
+    const preceptorMap = new Map<string, { nome: string; count: Set<string>; turnos: Set<string> }>();
     const especialidadeMap = new Map<string, Set<string>>();
     const unidadeMap = new Map<string, { nome: string; count: Set<string> }>();
 
@@ -169,9 +170,22 @@ function Dashboard() {
           preceptorMap.set(a.preceptor_id, {
             nome: a.preceptor || "Desconhecido",
             count: new Set(),
+            turnos: new Set(),
           });
         }
         if (a.aluno) preceptorMap.get(a.preceptor_id)!.count.add(a.aluno);
+        
+        // Add turno string
+        if (a.hora_inicio && a.hora_fim) {
+          const h = parseInt(a.hora_inicio.split(":")[0], 10);
+          let turnoLabel = "";
+          if (h >= 0 && h <= 12) turnoLabel = "☀️ Manhã";
+          else if (h > 12 && h < 18) turnoLabel = "🌤️ Tarde";
+          else turnoLabel = "🌙 Noite";
+          
+          const timeLabel = `${turnoLabel} (${a.hora_inicio.slice(0, 5)} - ${a.hora_fim.slice(0, 5)})`;
+          preceptorMap.get(a.preceptor_id)!.turnos.add(timeLabel);
+        }
       }
 
       const espNome = a.especialidade || "Sem Especialidade";
@@ -187,7 +201,11 @@ function Dashboard() {
     }
 
     const rData = Array.from(preceptorMap.values())
-      .map((p) => ({ preceptor: p.nome, alunos: p.count.size }))
+      .map((p) => ({ 
+        preceptor: p.nome, 
+        alunos: p.count.size,
+        turnos: Array.from(p.turnos)
+      }))
       .sort((a, b) => b.alunos - a.alunos)
       .slice(0, 10);
 
@@ -387,16 +405,36 @@ function Dashboard() {
                       axisLine={false}
                     />
                     <Tooltip
-                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                      contentStyle={{
-                        backgroundColor: "#0f172a",
-                        border: "1px solid #1e293b",
-                        borderRadius: "8px",
+                      cursor={{ fill: "rgba(100, 116, 139, 0.1)" }}
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 shadow-lg max-w-xs">
+                              <p className="text-slate-800 dark:text-slate-200 font-bold mb-2 border-b border-slate-100 dark:border-slate-800 pb-1">{label}</p>
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Alunos Vinculados</span>
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 rounded">
+                                  {data.alunos}
+                                </span>
+                              </div>
+                              {data.turnos && data.turnos.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Escala / Turnos</span>
+                                  {data.turnos.map((t: string, i: number) => (
+                                    <div key={i} className="text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/50 px-2 py-1 rounded">
+                                      {t}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+                        return null;
                       }}
-                      itemStyle={{ color: "#e2e8f0" }}
-                      labelStyle={{ color: "#f8fafc" }}
                     />
-                    <Bar dataKey="alunos" fill="#22c55e" radius={[0, 4, 4, 0]} maxBarSize={40} />
+                    <Bar dataKey="alunos" fill="#10b981" radius={[0, 4, 4, 0]} maxBarSize={40} />
                   </BarChart>
                 </ResponsiveContainer>
               </ClientOnly>
@@ -429,11 +467,13 @@ function Dashboard() {
                     </Pie>
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "#0f172a",
-                        border: "1px solid #1e293b",
+                        backgroundColor: "hsl(var(--background))",
+                        borderColor: "hsl(var(--border))",
                         borderRadius: "8px",
+                        color: "hsl(var(--foreground))",
+                        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                       }}
-                      itemStyle={{ color: "#e2e8f0" }}
+                      itemStyle={{ color: "hsl(var(--foreground))", fontWeight: 500 }}
                     />
                   </PieChart>
                 </ResponsiveContainer>

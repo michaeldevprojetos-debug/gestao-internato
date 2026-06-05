@@ -57,7 +57,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
+import { cn, getTurnoBadgeText } from "@/lib/utils";
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -84,6 +84,8 @@ type VinculoQtd = {
   id: string;
   preceptor_id: string;
   quantidade_alunos: number;
+  hora_inicio?: string | null;
+  hora_fim?: string | null;
 };
 
 type LocalRow = {
@@ -99,14 +101,16 @@ type LocalRow = {
     alunosCount: number;
     quantidadeAlunos: number;
     vinculoId: string | null;
+    hora_inicio: string | null;
+    hora_fim: string | null;
   }>;
-  alunosVinculados: Array<{
+  alunosVinculados: {
     aluno_id: string;
     aluno_nome: string;
     aluno_semestre: number | null;
     preceptor_nome: string;
     preceptor_id: string;
-  }>;
+  }[];
   totalAlunosVinculados: number;
 };
 
@@ -206,7 +210,7 @@ function HospitaisPage() {
       // 4. Vínculos operacionais
       const { data: vinculosData, error: err3 } = (await supabase
         .from("alocacoes" as any)
-        .select("id, preceptor_id, aluno_id, unidade_id, alunos ( nome, semestre )")) as { data: any[] | null; error: any };
+        .select("id, preceptor_id, aluno_id, unidade_id, hora_inicio, hora_fim, alunos ( nome, semestre )")) as { data: any[] | null; error: any };
       if (err3) throw err3;
 
       type AlunoInfo = { id: string; nome: string; semestre: number | null };
@@ -231,6 +235,8 @@ function HospitaisPage() {
             id: v.id,
             preceptor_id: v.preceptor_id,
             quantidade_alunos: v.quantidade_alunos ?? 0,
+            hora_inicio: v.hora_inicio ?? null,
+            hora_fim: v.hora_fim ?? null,
           });
         }
         if (!v.aluno_id) continue;
@@ -285,14 +291,19 @@ function HospitaisPage() {
           tipo: local.tipo,
           totalPreceptores: activePreceptors.length,
           especialidades: Array.from(specs).sort(),
-          preceptoresList: unitPreceptors.map((p) => ({
-            id: p.id,
-            nome: p.nome,
-            especialidade: p.especialidade,
-            alunosCount: preceptorAlunosSet.get(p.id)?.size ?? 0,
-            quantidadeAlunos: preceptorQtd.get(p.id)?.quantidade_alunos ?? 0,
-            vinculoId: preceptorQtd.get(p.id)?.id ?? null,
-          })),
+          preceptoresList: unitPreceptors.map((p) => {
+            const pqtd = preceptorQtd.get(p.id);
+            return {
+              id: p.id,
+              nome: p.nome,
+              especialidade: p.especialidade,
+              alunosCount: preceptorAlunosSet.get(p.id)?.size ?? 0,
+              quantidadeAlunos: pqtd?.quantidade_alunos ?? 0,
+              vinculoId: pqtd?.id ?? null,
+              hora_inicio: pqtd?.hora_inicio ?? null,
+              hora_fim: pqtd?.hora_fim ?? null,
+            };
+          }),
           alunosVinculados,
           totalAlunosVinculados,
         };
@@ -734,14 +745,24 @@ function PreceptorCard({
           )}
         </div>
 
+        <div className="flex items-center gap-2 mb-2">
+          <div className="text-xs text-foreground/80 leading-snug">
+            <span className="font-semibold">Quantidade de alunos:</span>{" "}
+            <Badge
+              variant={exceeded ? "destructive" : "secondary"}
+              className="text-[10px] py-0 px-1.5"
+            >
+              {p.alunosCount}
+            </Badge>
+          </div>
+          {(p as any).hora_inicio && (p as any).hora_fim && (
+            <Badge variant="outline" className="text-[10px] ml-auto bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+              {getTurnoBadgeText((p as any).hora_inicio, (p as any).hora_fim)}
+            </Badge>
+          )}
+        </div>
+
         <div className="text-xs text-foreground/80 leading-snug">
-          <span className="font-semibold">Quantidade de alunos:</span>{" "}
-          <Badge
-            variant={exceeded ? "destructive" : "secondary"}
-            className="text-[10px] py-0 px-1.5"
-          >
-            {p.alunosCount}
-          </Badge>
           {students.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {students.map((s, idx) => (
@@ -1326,7 +1347,45 @@ function GerenciarUnidadeDialog({
         }
       }
     }
-    // --- FIM VALIDAÇÃO ANTI-CONFLITO ---
+    // --- FIM VALIDAÇÃO ANTI-CONFLITO ALUNOS ---
+
+    // --- INÍCIO VALIDAÇÃO ANTI-CONFLITO PRECEPTORES ---
+    const allSelectedPreceptorIds = Array.from(new Set(
+      selectedPreceptores.map(tag => tag.type === "existing" ? tag.id : null).filter(Boolean) as string[]
+    ));
+
+    if (allSelectedPreceptorIds.length > 0) {
+      const { data: preceptorAlocacoes, error: pFetchErr } = (await supabase
+        .from("alocacoes" as any)
+        .select("id, preceptor_id, unidade_id, data_inicio, data_fim, hora_inicio, hora_fim")
+        .in("preceptor_id", allSelectedPreceptorIds)) as { data: any[] | null; error: any };
+
+      if (!pFetchErr && preceptorAlocacoes) {
+        const newStart = new Date(dataInicio || new Date().toISOString().split("T")[0]);
+        const newEnd = dataFim ? new Date(dataFim) : new Date("2099-12-31");
+        const nHI = horaInicio || "00:00";
+        const nHF = horaFim || "23:59";
+
+        for (const ext of preceptorAlocacoes) {
+          const extStart = new Date(ext.data_inicio);
+          const extEnd = ext.data_fim ? new Date(ext.data_fim) : new Date("2099-12-31");
+          const eHI = ext.hora_inicio || "00:00";
+          const eHF = ext.hora_fim || "23:59";
+
+          const datesOverlap = newStart <= extEnd && newEnd >= extStart;
+          const timesOverlap = nHI < eHF && nHF > eHI;
+
+          if (datesOverlap && timesOverlap) {
+            const savingLocalId = local?.id;
+            if (ext.unidade_id !== savingLocalId) {
+              toast.error("Conflito de Agenda: Este preceptor já está escalado para prestar atendimento em outro hospital neste mesmo dia e horário!");
+              return;
+            }
+          }
+        }
+      }
+    }
+    // --- FIM VALIDAÇÃO ANTI-CONFLITO PRECEPTORES ---
 
     setSaving(true);
     try {

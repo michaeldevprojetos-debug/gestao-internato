@@ -20,7 +20,7 @@ CREATE OR REPLACE VIEW public.vw_dashboard_preceptores AS
 SELECT
     al.id AS alocacao_id,
     p.nome AS preceptor,
-    COALESCE(e.nome, esp_pai.nome, 'Sem Especialidade') AS especialidade,
+    COALESCE(e.nome, esp_pai.nome, p.especialidade, 'Sem Especialidade') AS especialidade,
     u.nome AS unidade,
     a.nome AS aluno,
     al.carga_horaria AS carga_horaria,
