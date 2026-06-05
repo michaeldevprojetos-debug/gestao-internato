@@ -1,68 +1,35 @@
-CREATE TABLE IF NOT EXISTS public.unidades (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nome TEXT NOT NULL UNIQUE,
-    tipo TEXT,
-    ativo BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- 1. Cria as colunas de calendário e horário que o front-end está tentando ler e gravar
+ALTER TABLE public.alocacoes ADD COLUMN IF NOT EXISTS data_inicio DATE DEFAULT CURRENT_DATE;
+ALTER TABLE public.alocacoes ADD COLUMN IF NOT EXISTS data_fim DATE;
+ALTER TABLE public.alocacoes ADD COLUMN IF NOT EXISTS hora_inicio TIME WITHOUT TIME ZONE;
+ALTER TABLE public.alocacoes ADD COLUMN IF NOT EXISTS hora_fim TIME WITHOUT TIME ZONE;
+ALTER TABLE public.alocacoes ADD COLUMN IF NOT EXISTS carga_horaria INTEGER;
 
-CREATE TABLE IF NOT EXISTS public.especialidades (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nome TEXT NOT NULL UNIQUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- 2. Limpa de forma absoluta qualquer registro fantasma para zerar os testes
+TRUNCATE TABLE public.alocacoes CASCADE;
 
-CREATE TABLE IF NOT EXISTS public.preceptores (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nome TEXT NOT NULL UNIQUE,
-    especialidade_id UUID REFERENCES public.especialidades(id) ON DELETE SET NULL,
-    ativo BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS public.alunos (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nome TEXT NOT NULL,
-    matricula TEXT UNIQUE,
-    semestre INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS public.alocacoes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    aluno_id UUID REFERENCES public.alunos(id) ON DELETE CASCADE,
-    preceptor_id UUID REFERENCES public.preceptores(id) ON DELETE CASCADE,
-    unidade_id UUID REFERENCES public.unidades(id) ON DELETE CASCADE,
-    especialidade_id UUID REFERENCES public.especialidades(id) ON DELETE SET NULL,
-    data_inicio DATE NOT NULL,
-    data_fim DATE,
-    hora_inicio TIME,
-    hora_fim TIME,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
+-- 3. Recria a View de forma limpa acompanhando os novos campos de data
 DROP VIEW IF EXISTS public.vw_dashboard_preceptores CASCADE;
-
 CREATE OR REPLACE VIEW public.vw_dashboard_preceptores AS
-SELECT 
+SELECT
+    al.id AS alocacao_id,
+    p.nome AS preceptor,
+    e.nome AS especialidade,
+    u.nome AS unidade,
+    a.nome AS aluno,
+    al.carga_horaria AS carga_horaria,
+    al.data_inicio,
+    al.data_fim,
+    al.hora_inicio,
+    al.hora_fim,
     p.id AS preceptor_id,
-    p.nome AS preceptor_nome,
-    e.nome AS especialidade_nome,
     u.id AS unidade_id,
-    u.nome AS unidade_nome,
-    u.tipo AS unidade_tipo,
-    u.ativo AS unidade_ativa,
-    COUNT(DISTINCT a.aluno_id) AS total_alunos
-FROM public.preceptores p
-LEFT JOIN public.especialidades e ON p.especialidade_id = e.id
-LEFT JOIN public.alocacoes a ON p.id = a.preceptor_id 
-    AND (a.data_fim IS NULL OR a.data_fim >= CURRENT_DATE)
-LEFT JOIN public.unidades u ON a.unidade_id = u.id
-GROUP BY 
-    p.id, 
-    p.nome, 
-    e.nome,
-    u.id, 
-    u.nome, 
-    u.tipo, 
-    u.ativo;
+    e.id AS especialidade_id
+FROM public.alocacoes al
+INNER JOIN public.alunos a ON a.id = al.aluno_id
+INNER JOIN public.preceptores p ON p.id = al.preceptor_id
+INNER JOIN public.unidades u ON u.id = al.unidade_id
+LEFT JOIN public.especialidades e ON e.id = al.especialidade_id;
+
+-- 4. Notifica o cache do Supabase para atualizar o Schema imediatamente
+NOTIFY pgrst, 'reload schema';

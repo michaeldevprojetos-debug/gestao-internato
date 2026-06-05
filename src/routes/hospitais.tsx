@@ -327,6 +327,8 @@ function HospitaisPage() {
 
       toast.success(`Unidade "${localNome}" excluída com sucesso!`);
       fetchLocais();
+      queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
+      queryClient.invalidateQueries({ queryKey: ['alocacoes'] });
     } catch (e: any) {
       toast.error("Erro ao excluir: " + (e?.message ?? "Tente novamente."));
     }
@@ -665,7 +667,8 @@ function HospitaisPage() {
         onSaved={() => {
           setDialogOpen(false);
           fetchLocais();
-          queryClient.invalidateQueries();
+          queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
+          queryClient.invalidateQueries({ queryKey: ['alocacoes'] });
         }}
       />
     </div>

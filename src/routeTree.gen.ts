@@ -20,6 +20,7 @@ import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as CargaHorariaRouteImport } from './routes/carga-horaria'
 import { Route as AtividadesRouteImport } from './routes/atividades'
 import { Route as AlunosRouteImport } from './routes/alunos'
+import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as IndexRouteImport } from './routes/index'
 
 const VinculosRoute = VinculosRouteImport.update({
@@ -77,6 +78,11 @@ const AlunosRoute = AlunosRouteImport.update({
   path: '/alunos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgendaRoute = AgendaRouteImport.update({
+  id: '/agenda',
+  path: '/agenda',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -85,6 +91,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agenda': typeof AgendaRoute
   '/alunos': typeof AlunosRoute
   '/atividades': typeof AtividadesRoute
   '/carga-horaria': typeof CargaHorariaRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agenda': typeof AgendaRoute
   '/alunos': typeof AlunosRoute
   '/atividades': typeof AtividadesRoute
   '/carga-horaria': typeof CargaHorariaRoute
@@ -114,6 +122,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agenda': typeof AgendaRoute
   '/alunos': typeof AlunosRoute
   '/atividades': typeof AtividadesRoute
   '/carga-horaria': typeof CargaHorariaRoute
@@ -130,6 +139,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agenda'
     | '/alunos'
     | '/atividades'
     | '/carga-horaria'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agenda'
     | '/alunos'
     | '/atividades'
     | '/carga-horaria'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/agenda'
     | '/alunos'
     | '/atividades'
     | '/carga-horaria'
@@ -173,6 +185,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgendaRoute: typeof AgendaRoute
   AlunosRoute: typeof AlunosRoute
   AtividadesRoute: typeof AtividadesRoute
   CargaHorariaRoute: typeof CargaHorariaRoute
@@ -265,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlunosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agenda': {
+      id: '/agenda'
+      path: '/agenda'
+      fullPath: '/agenda'
+      preLoaderRoute: typeof AgendaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -277,6 +297,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgendaRoute: AgendaRoute,
   AlunosRoute: AlunosRoute,
   AtividadesRoute: AtividadesRoute,
   CargaHorariaRoute: CargaHorariaRoute,
