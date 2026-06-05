@@ -44,6 +44,8 @@ type PreceptorRow = {
   especialidade_id: string | null;
   especialidade_nome: string | null;
   ativo: boolean;
+  tipo_remuneracao?: string;
+  valor_hora?: number;
 };
 
 type Especialidade = {
@@ -70,7 +72,7 @@ function PreceptoresPage() {
       const [precRes, espRes] = await Promise.all([
         supabase
           .from("preceptores" as any)
-          .select("id, nome, especialidade_id, ativo, especialidades(nome)")
+          .select("id, nome, especialidade_id, ativo, tipo_remuneracao, valor_hora, especialidades(nome)")
           .order("nome"),
         supabase
           .from("especialidades" as any)
@@ -89,6 +91,8 @@ function PreceptoresPage() {
         especialidade_id: p.especialidade_id,
         especialidade_nome: p.especialidades?.nome || null,
         ativo: p.ativo ?? true,
+        tipo_remuneracao: p.tipo_remuneracao || "Bolsa",
+        valor_hora: p.valor_hora || 80.00,
       }));
 
       setPreceptores(rows);
@@ -305,12 +309,16 @@ function PreceptorDialog({
   const [nome, setNome] = useState("");
   const [especialidadeId, setEspecialidadeId] = useState<string>("none");
   const [ativo, setAtivo] = useState(true);
+  const [tipoRemuneracao, setTipoRemuneracao] = useState("Bolsa");
+  const [valorHora, setValorHora] = useState<number | "">(80);
 
   useEffect(() => {
     if (open) {
       setNome(preceptor?.nome ?? "");
       setEspecialidadeId(preceptor?.especialidade_id ?? "none");
       setAtivo(preceptor?.ativo ?? true);
+      setTipoRemuneracao(preceptor?.tipo_remuneracao ?? "Bolsa");
+      setValorHora(preceptor?.valor_hora ?? 80);
     }
   }, [open, preceptor]);
 
@@ -325,6 +333,8 @@ function PreceptorDialog({
         nome,
         especialidade_id: especialidadeId === "none" ? null : especialidadeId,
         ativo,
+        tipo_remuneracao: tipoRemuneracao,
+        valor_hora: valorHora === "" ? 0 : Number(valorHora),
       };
 
       if (isEdit && preceptor) {
@@ -380,6 +390,36 @@ function PreceptorDialog({
               </SelectContent>
             </Select>
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="tipo-remun">Tipo de Remuneração</Label>
+              <Select value={tipoRemuneracao} onValueChange={setTipoRemuneracao}>
+                <SelectTrigger id="tipo-remun">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Bolsa">Bolsa</SelectItem>
+                  <SelectItem value="CLT">CLT</SelectItem>
+                  <SelectItem value="PJ">PJ</SelectItem>
+                  <SelectItem value="Voluntário">Voluntário</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="valor-hora">Valor Hora (R$)</Label>
+              <Input
+                id="valor-hora"
+                type="number"
+                min={0}
+                step={0.01}
+                value={valorHora}
+                onChange={(e) => setValorHora(e.target.value === "" ? "" : Number(e.target.value))}
+                placeholder="Ex: 80.00"
+              />
+            </div>
+          </div>
+
           {isEdit && (
             <div className="grid gap-2">
               <Label htmlFor="status">Status</Label>

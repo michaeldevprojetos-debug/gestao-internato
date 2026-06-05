@@ -99,6 +99,7 @@ function Dashboard() {
   const [selectedUnidade, setSelectedUnidade] = useState<string>("all");
   const [selectedEspecialidade, setSelectedEspecialidade] = useState<string>("all");
   const [selectedPreceptor, setSelectedPreceptor] = useState<string>("all");
+  const [selectedMes, setSelectedMes] = useState<string>("all");
 
   const { data: dashboardData, isLoading: loading } = useQuery({
     queryKey: ["dashboardData"],
@@ -133,6 +134,12 @@ function Dashboard() {
     return Array.from(unis.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
   }, [alocacoes]);
 
+  const dynamicMesesFiltro = useMemo(() => {
+    const meses = new Set<string>();
+    alocacoes.forEach(a => { if (a.mes_referencia) meses.add(a.mes_referencia); });
+    return Array.from(meses).sort();
+  }, [alocacoes]);
+
   const dynamicEspecialidadesFiltro = useMemo(() => {
     const specs = new Set<string>();
     alocacoes.forEach(a => { 
@@ -155,10 +162,11 @@ function Dashboard() {
       
       const aEspecialidade = a.text_especialidade || a.especialidade || "Sem Especialidade";
       const passEspecialidade = selectedEspecialidade === "all" || aEspecialidade === selectedEspecialidade;
+      const passMes = selectedMes === "all" || a.mes_referencia === selectedMes;
       
-      return passUnidade && passEspecialidade && passPreceptor;
+      return passUnidade && passEspecialidade && passPreceptor && passMes;
     });
-  }, [alocacoes, selectedUnidade, selectedEspecialidade, selectedPreceptor]);
+  }, [alocacoes, selectedUnidade, selectedEspecialidade, selectedPreceptor, selectedMes]);
 
   // Calcular KPIs
   const {
@@ -169,6 +177,7 @@ function Dashboard() {
     especialidadeData,
     alertasPreceptor,
     alertasUnidade,
+    custoAcumulado,
   } = useMemo(() => {
     const alunosSet = new Set<string>();
     const preceptoresSet = new Set<string>();
@@ -177,11 +186,16 @@ function Dashboard() {
     const preceptorMap = new Map<string, { nome: string; count: Set<string>; turnos: Set<string>; especialidades: Set<string> }>();
     const especialidadeMap = new Map<string, Set<string>>();
     const unidadeMap = new Map<string, { nome: string; count: Set<string> }>();
+    let custoAcumulado = 0;
 
     for (const a of filteredAloc) {
       if (a.aluno) alunosSet.add(a.aluno);
       if (a.preceptor_id) preceptoresSet.add(a.preceptor_id);
       if (a.unidade_id) unidadesSet.add(a.unidade_id);
+      
+      const rowCost = Number(a.custo_total_rotacao || 0);
+      const qtdAlunos = Number(a.qtd_alunos_alocacao || 1);
+      custoAcumulado += (rowCost / (qtdAlunos > 0 ? qtdAlunos : 1));
 
       if (a.preceptor_id) {
         if (!preceptorMap.has(a.preceptor_id)) {
@@ -250,6 +264,7 @@ function Dashboard() {
       especialidadeData: eData,
       alertasPreceptor: aPrec,
       alertasUnidade: aUni,
+      custoAcumulado,
     };
   }, [filteredAloc, limitePreceptor, limiteUnidade]);
 
@@ -277,6 +292,20 @@ function Dashboard() {
         </div>
 
         <div className="relative z-10 flex flex-wrap xl:flex-nowrap items-center gap-3">
+          <Select value={selectedMes} onValueChange={setSelectedMes}>
+            <SelectTrigger className="w-[180px] bg-slate-900/80 border-slate-700 text-slate-200">
+              <SelectValue placeholder="Todos os Meses" />
+            </SelectTrigger>
+            <SelectContent className="max-h-80">
+              <SelectItem value="all">Todos os Meses</SelectItem>
+              {dynamicMesesFiltro.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={selectedUnidade} onValueChange={setSelectedUnidade}>
             <SelectTrigger className="w-[180px] bg-slate-900/80 border-slate-700 text-slate-200">
               <SelectValue placeholder="Todas as Unidades" />
