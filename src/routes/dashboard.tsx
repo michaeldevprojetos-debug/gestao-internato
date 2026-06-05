@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -9,6 +9,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   PieChart,
   Pie,
@@ -23,7 +29,14 @@ import {
 } from "recharts";
 import { ClientOnly } from "@/components/client-only";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Users,
   Stethoscope,
@@ -33,8 +46,6 @@ import {
   AlertTriangle,
   RefreshCw,
   CheckCircle2,
-  User,
-  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemConfig } from "@/hooks/use-system-config";
@@ -81,98 +92,143 @@ function Stat({
 }
 
 const COLORS = [
-  "#0ea5e9", // Azul safira/oceano
-  "#10b981", // Verde hospitalar
-  "#3b82f6", // Azul royal
-  "#14b8a6", // Turquesa
-  "#64748b", // Grafite suave
-  "#06b6d4", // Ciano
-  "#22c55e", // Verde claro
-  "#334155", // Grafite escuro
-  "#6366f1", // Índigo
-  "#475569", // Slate
+  "#0ea5e9",
+  "#10b981",
+  "#3b82f6",
+  "#14b8a6",
+  "#64748b",
+  "#06b6d4",
+  "#22c55e",
+  "#334155",
+  "#6366f1",
+  "#475569",
 ];
+
+function getTurnoLabel(horaInicio?: string, horaFim?: string): string {
+  if (!horaInicio) return "Não informado";
+  const h = parseInt(horaInicio.split(":")[0], 10);
+  let turno = "";
+  if (h >= 0 && h < 12) turno = "☀️ Manhã";
+  else if (h >= 12 && h < 18) turno = "🌤️ Tarde";
+  else turno = "🌙 Noite";
+  if (horaFim) {
+    return `${turno} (${horaInicio.slice(0, 5)} - ${horaFim.slice(0, 5)})`;
+  }
+  return turno;
+}
 
 function Dashboard() {
   const { config } = useSystemConfig();
   const limitePreceptor = config.limitePreceptor;
   const limiteUnidade = config.limiteUnidade;
-
   const queryClient = useQueryClient();
 
+  // --- Filtros globais ---
   const [selectedUnidade, setSelectedUnidade] = useState<string>("all");
   const [selectedEspecialidade, setSelectedEspecialidade] = useState<string>("all");
   const [selectedPreceptor, setSelectedPreceptor] = useState<string>("all");
   const [selectedMes, setSelectedMes] = useState<string>("all");
 
+  // --- Sheet lateral (Raio-X) ---
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetPreceptorId, setSheetPreceptorId] = useState<string | null>(null);
+
+  // Abrir sheet quando filtro de preceptor muda
+  useEffect(() => {
+    if (selectedPreceptor !== "all") {
+      setSheetPreceptorId(selectedPreceptor);
+      setSheetOpen(true);
+    } else {
+      setSheetOpen(false);
+      setSheetPreceptorId(null);
+    }
+  }, [selectedPreceptor]);
+
+  // --- Query principal ---
   const { data: dashboardData, isLoading: loading } = useQuery({
     queryKey: ["dashboardData"],
     queryFn: async () => {
-      const [uRes, eRes, pRes] = await Promise.all([
-        (supabase.from("unidades" as any).select("id, nome").eq("ativo", true).order("nome")) as unknown as Promise<{ data: any[] | null }>,
-        (supabase.from("especialidades" as any).select("id, nome").order("nome")) as unknown as Promise<{ data: any[] | null }>,
-        (supabase.from("preceptores" as any).select("id, nome").order("nome")) as unknown as Promise<{ data: any[] | null }>,
-      ]);
-
-      const { data: viewData, error } = (await supabase.from("vw_dashboard_preceptores" as any).select("*")) as { data: any[] | null; error: any };
-
+      const { data: viewData, error } = (await supabase
+        .from("vw_dashboard_preceptores" as any)
+        .select("*")) as { data: any[] | null; error: any };
       if (error) throw error;
-
-      return {
-        unidades: uRes.data || [],
-        especialidades: eRes.data || [],
-        preceptores: pRes.data || [],
-        alocacoes: viewData || [],
-      };
+      return { alocacoes: viewData || [] };
     },
   });
 
-  const alocacoes = dashboardData?.alocacoes || [];
-  const horasConcluidas = 0; // Se necessário, re-implementar a lógica de agenda separadamente
-  const lastUpdate = new Date(); // Para simplificar a UI
+  // --- Supabase Realtime: escuta alocacoes e invalida cache ---
+  useEffect(() => {
+    const channel = supabase
+      .channel("dashboard-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "alocacoes" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
+        }
+      )
+      .subscribe();
 
-  // Build dynamic filters from ACTUAL allocations to ensure 100% accuracy
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  const alocacoes = dashboardData?.alocacoes || [];
+  const lastUpdate = new Date();
+
+  // --- Filtros dinâmicos ---
   const dynamicUnidadesFiltro = useMemo(() => {
     const unis = new Map<string, string>();
-    alocacoes.forEach(a => { if (a.unidade_id && a.unidade) unis.set(a.unidade_id, a.unidade); });
-    return Array.from(unis.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+    alocacoes.forEach((a) => {
+      if (a.unidade_id && a.unidade) unis.set(a.unidade_id, a.unidade);
+    });
+    return Array.from(unis.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
   }, [alocacoes]);
 
   const dynamicMesesFiltro = useMemo(() => {
     const meses = new Set<string>();
-    alocacoes.forEach(a => { if (a.mes_referencia) meses.add(a.mes_referencia); });
+    alocacoes.forEach((a) => {
+      if (a.mes_referencia) meses.add(a.mes_referencia);
+    });
     return Array.from(meses).sort();
   }, [alocacoes]);
 
   const dynamicEspecialidadesFiltro = useMemo(() => {
     const specs = new Set<string>();
-    alocacoes.forEach(a => { 
-      // Robust mapping: Prioritize text_especialidade from the view
-      specs.add(a.text_especialidade || a.especialidade || "Sem Especialidade"); 
+    alocacoes.forEach((a) => {
+      specs.add(a.text_especialidade || a.especialidade || "Sem Especialidade");
     });
-    return Array.from(specs).sort().map((nome) => ({ id: nome, nome }));
+    return Array.from(specs)
+      .sort()
+      .map((nome) => ({ id: nome, nome }));
   }, [alocacoes]);
 
   const dynamicPreceptoresFiltro = useMemo(() => {
     const precs = new Map<string, string>();
-    alocacoes.forEach(a => { if (a.preceptor_id && a.preceptor) precs.set(a.preceptor_id, a.preceptor); });
-    return Array.from(precs.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+    alocacoes.forEach((a) => {
+      if (a.preceptor_id && a.preceptor) precs.set(a.preceptor_id, a.preceptor);
+    });
+    return Array.from(precs.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
   }, [alocacoes]);
 
+  // --- Array filtrado (Single Source of Truth) ---
   const filteredAloc = useMemo(() => {
     return alocacoes.filter((a) => {
       const passUnidade = selectedUnidade === "all" || a.unidade_id === selectedUnidade;
       const passPreceptor = selectedPreceptor === "all" || a.preceptor_id === selectedPreceptor;
-      
-      const aEspecialidade = a.text_especialidade || a.especialidade || "Sem Especialidade";
-      const passEspecialidade = selectedEspecialidade === "all" || aEspecialidade === selectedEspecialidade;
+      const aEsp = a.text_especialidade || a.especialidade || "Sem Especialidade";
+      const passEspecialidade = selectedEspecialidade === "all" || aEsp === selectedEspecialidade;
       const passMes = selectedMes === "all" || a.mes_referencia === selectedMes;
-      
       return passUnidade && passEspecialidade && passPreceptor && passMes;
     });
   }, [alocacoes, selectedUnidade, selectedEspecialidade, selectedPreceptor, selectedMes]);
 
-  // Calcular KPIs
+  // --- KPIs + Ranking + Especialidade + Alertas ---
   const {
     totalAlunos,
     totalPreceptores,
@@ -181,28 +237,28 @@ function Dashboard() {
     especialidadeData,
     alertasPreceptor,
     alertasUnidade,
-    custoAcumulado,
-    rankingDataFull,
-    distribuicaoData,
   } = useMemo(() => {
     const alunosSet = new Set<string>();
     const preceptoresSet = new Set<string>();
     const unidadesSet = new Set<string>();
 
-    const preceptorMap = new Map<string, { id: string; nome: string; count: Set<string>; listaAlunos: Set<string>; turnos: Set<string>; especialidades: Set<string>; unidades: Set<string>; ch_total: number }>();
+    const preceptorMap = new Map<
+      string,
+      {
+        id: string;
+        nome: string;
+        count: Set<string>;
+        turnos: Set<string>;
+        especialidades: Set<string>;
+      }
+    >();
     const especialidadeMap = new Map<string, Set<string>>();
     const unidadeMap = new Map<string, { nome: string; count: Set<string> }>();
-    const distribuicaoMap = new Map<string, { unidade: string; especialidade: string; preceptor: string; alunos: Set<string>; carga_horaria: number }>();
-    let custoAcumulado = 0;
 
     for (const a of filteredAloc) {
       if (a.aluno) alunosSet.add(a.aluno);
       if (a.preceptor_id) preceptoresSet.add(a.preceptor_id);
       if (a.unidade_id) unidadesSet.add(a.unidade_id);
-      
-      const rowCost = Number(a.custo_total_rotacao || 0);
-      const qtdAlunos = Number(a.qtd_alunos_alocacao || 1);
-      custoAcumulado += (rowCost / (qtdAlunos > 0 ? qtdAlunos : 1));
 
       if (a.preceptor_id) {
         if (!preceptorMap.has(a.preceptor_id)) {
@@ -210,50 +266,16 @@ function Dashboard() {
             id: a.preceptor_id,
             nome: a.preceptor || "Desconhecido",
             count: new Set(),
-            listaAlunos: new Set(),
             turnos: new Set(),
             especialidades: new Set(),
-            unidades: new Set(),
-            ch_total: 0,
           });
         }
         const pObj = preceptorMap.get(a.preceptor_id)!;
-        if (a.aluno) {
-          pObj.count.add(a.aluno);
-          pObj.listaAlunos.add(a.aluno);
-        }
+        if (a.aluno) pObj.count.add(a.aluno);
         const pEsp = a.text_especialidade || a.especialidade;
         if (pEsp && pEsp !== "Sem Especialidade") pObj.especialidades.add(pEsp);
-        if (a.unidade) pObj.unidades.add(a.unidade);
-        
-        pObj.ch_total += Number(a.ch_prevista || a.carga_horaria || 0) / Number(a.qtd_alunos_alocacao || 1);
-        
-        if (a.hora_inicio && a.hora_fim) {
-          const h = parseInt(a.hora_inicio.split(":")[0], 10);
-          let turnoLabel = "";
-          if (h >= 0 && h <= 12) turnoLabel = "☀️ Manhã";
-          else if (h > 12 && h < 18) turnoLabel = "🌤️ Tarde";
-          else turnoLabel = "🌙 Noite";
-          
-          const timeLabel = `${turnoLabel} (${a.hora_inicio.slice(0, 5)} - ${a.hora_fim.slice(0, 5)})`;
-          pObj.turnos.add(timeLabel);
-        }
-      }
-      
-      // Distribuicao Academica
-      if (a.unidade && a.preceptor) {
-        const dKey = `${a.unidade}_${a.text_especialidade || a.especialidade}_${a.preceptor}`;
-        if (!distribuicaoMap.has(dKey)) {
-          distribuicaoMap.set(dKey, {
-            unidade: a.unidade,
-            especialidade: a.text_especialidade || a.especialidade || "Sem Especialidade",
-            preceptor: a.preceptor,
-            alunos: new Set(),
-            carga_horaria: 0
-          });
-        }
-        distribuicaoMap.get(dKey)!.carga_horaria += Number(a.ch_prevista || a.carga_horaria || 0) / Number(a.qtd_alunos_alocacao || 1);
-        if (a.aluno) distribuicaoMap.get(dKey)!.alunos.add(a.aluno);
+        const turnoStr = getTurnoLabel(a.hora_inicio, a.hora_fim);
+        pObj.turnos.add(turnoStr);
       }
 
       const espNome = a.text_especialidade || a.especialidade || "Sem Especialidade";
@@ -268,28 +290,16 @@ function Dashboard() {
       }
     }
 
-    const rankingDataFull = Array.from(preceptorMap.values())
-      .map((p) => ({ 
+    const rData = Array.from(preceptorMap.values())
+      .map((p) => ({
         id: p.id,
-        preceptor: p.nome, 
+        preceptor: p.nome,
         alunos: p.count.size,
         turnos: Array.from(p.turnos),
-        text_especialidade: Array.from(p.especialidades).join(', ') || "Sem Especialidade",
-        unidades: Array.from(p.unidades),
-        ch_total: p.ch_total,
-        listaAlunos: Array.from(p.listaAlunos)
+        text_especialidade: Array.from(p.especialidades).join(", ") || "Sem Especialidade",
       }))
-      .sort((a, b) => b.alunos - a.alunos);
-      
-    const rData = rankingDataFull.slice(0, 10);
-    
-    const dData = Array.from(distribuicaoMap.values()).map(d => ({
-      unidade: d.unidade,
-      especialidade: d.especialidade,
-      preceptor: d.preceptor,
-      alunos: d.alunos.size,
-      carga_horaria: d.carga_horaria
-    })).sort((a, b) => a.unidade.localeCompare(b.unidade) || b.alunos - a.alunos);
+      .sort((a, b) => b.alunos - a.alunos)
+      .slice(0, 10);
 
     const eData = Array.from(especialidadeMap.entries())
       .map(([name, set]) => ({ name, value: set.size }))
@@ -298,30 +308,180 @@ function Dashboard() {
     const aPrec = Array.from(preceptorMap.values())
       .filter((p) => p.count.size > limitePreceptor)
       .map((p) => ({ nome: p.nome, alunos: p.count.size }));
+
     const aUni = Array.from(unidadeMap.values())
       .filter((u) => u.count.size > limiteUnidade)
       .map((u) => ({ nome: u.nome, alunos: u.count.size }));
 
     return {
-      totalAlunos: filteredAloc.length,
+      totalAlunos: alunosSet.size,
       totalPreceptores: preceptoresSet.size,
       totalUnidades: unidadesSet.size,
       rankingData: rData,
-      rankingDataFull,
-      distribuicaoData: dData,
       especialidadeData: eData,
       alertasPreceptor: aPrec,
       alertasUnidade: aUni,
-      custoAcumulado,
     };
   }, [filteredAloc, limitePreceptor, limiteUnidade]);
+
+  // --- Tabela de Distribuição Acadêmica ---
+  const distribuicaoData = useMemo(() => {
+    const map = new Map<
+      string,
+      { unidade: string; especialidade: string; preceptor: string; alunos: Set<string> }
+    >();
+    for (const a of filteredAloc) {
+      if (!a.unidade || !a.preceptor) continue;
+      const esp = a.text_especialidade || a.especialidade || "Sem Especialidade";
+      const key = `${a.unidade_id}_${esp}_${a.preceptor_id}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          unidade: a.unidade,
+          especialidade: esp,
+          preceptor: a.preceptor,
+          alunos: new Set(),
+        });
+      }
+      if (a.aluno) map.get(key)!.alunos.add(a.aluno);
+    }
+    return Array.from(map.values())
+      .map((d) => ({ ...d, qtdAlunos: d.alunos.size }))
+      .sort((a, b) => a.unidade.localeCompare(b.unidade) || b.qtdAlunos - a.qtdAlunos);
+  }, [filteredAloc]);
+
+  // --- Dados do Sheet (Raio-X do Preceptor) ---
+  const sheetData = useMemo(() => {
+    if (!sheetPreceptorId) return null;
+    const rows = alocacoes.filter((a) => a.preceptor_id === sheetPreceptorId);
+    if (rows.length === 0) return null;
+
+    const nome = rows[0]?.preceptor || "Desconhecido";
+    const unidades = [...new Set(rows.map((r: any) => r.unidade).filter(Boolean))];
+    const especialidades = [...new Set(rows.map((r: any) => r.text_especialidade || r.especialidade).filter(Boolean))];
+    const alunos = [...new Set(rows.map((r: any) => r.aluno).filter(Boolean))];
+    const turnos = [...new Set(rows.map((r: any) => getTurnoLabel(r.hora_inicio, r.hora_fim)))];
+    const ch = rows.reduce((acc: number, r: any) => {
+      return acc + (Number(r.ch_prevista || r.carga_horaria || 0) / Number(r.qtd_alunos_alocacao || 1));
+    }, 0);
+
+    return { nome, unidades, especialidades, alunos, turnos, ch: Math.round(ch) };
+  }, [sheetPreceptorId, alocacoes]);
 
   const mediaAlunosPreceptor =
     totalPreceptores > 0 ? (totalAlunos / totalPreceptores).toFixed(1) : "0.0";
 
+  const handleBarClick = (data: any) => {
+    if (data && data.activePayload?.[0]?.payload?.id) {
+      const id = data.activePayload[0].payload.id;
+      setSelectedPreceptor((prev) => (prev === id ? "all" : id));
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
-      {/* ── HEADER & FILTERS ── */}
+
+      {/* ── Sheet Lateral: Raio-X do Preceptor ── */}
+      <Sheet open={sheetOpen} onOpenChange={(open) => {
+        setSheetOpen(open);
+        if (!open) setSelectedPreceptor("all");
+      }}>
+        <SheetContent side="right" className="w-full sm:w-[480px] bg-slate-950 border-slate-800 text-white overflow-y-auto">
+          <SheetHeader className="border-b border-slate-800 pb-4 mb-6">
+            <SheetTitle className="text-white text-xl flex items-center gap-2">
+              <Stethoscope className="h-6 w-6 text-emerald-400" />
+              Raio-X do Preceptor
+            </SheetTitle>
+          </SheetHeader>
+
+          {sheetData ? (
+            <div className="space-y-6">
+              {/* Nome */}
+              <div className="flex items-center gap-3 bg-slate-900 rounded-xl p-4 border border-slate-800">
+                <div className="h-12 w-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                  {sheetData.nome.charAt(0)}
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-0.5">👨‍⚕️ Preceptor</p>
+                  <p className="text-lg font-bold text-white">{sheetData.nome}</p>
+                </div>
+              </div>
+
+              {/* Campos de info */}
+              <div className="space-y-4">
+                <div className="bg-slate-900/60 rounded-lg p-4 border border-slate-800/50">
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" /> Unidade Hospitalar
+                  </p>
+                  <p className="text-sm text-slate-200 font-medium">{sheetData.unidades.join(", ") || "—"}</p>
+                </div>
+
+                <div className="bg-slate-900/60 rounded-lg p-4 border border-slate-800/50">
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Stethoscope className="h-3.5 w-3.5" /> Especialidade
+                  </p>
+                  <p className="text-sm text-slate-200 font-medium">{sheetData.especialidades.join(", ") || "—"}</p>
+                </div>
+
+                <div className="bg-slate-900/60 rounded-lg p-4 border border-slate-800/50">
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" /> Turno
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {sheetData.turnos.filter(t => t !== "Não informado").map((t, i) => (
+                      <Badge key={i} variant="outline" className="bg-slate-800 text-slate-300 border-slate-700 text-xs">{t}</Badge>
+                    ))}
+                    {sheetData.turnos.every(t => t === "Não informado") && (
+                      <span className="text-sm text-slate-500">Não informado</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-emerald-950/40 rounded-lg p-4 border border-emerald-900/40 text-center">
+                    <p className="text-xs text-emerald-400/70 font-bold uppercase tracking-wider mb-1 flex items-center justify-center gap-1">
+                      <Users className="h-3 w-3" /> Alunos
+                    </p>
+                    <p className="text-3xl font-black text-emerald-400">{sheetData.alunos.length}</p>
+                  </div>
+                  <div className="bg-blue-950/40 rounded-lg p-4 border border-blue-900/40 text-center">
+                    <p className="text-xs text-blue-400/70 font-bold uppercase tracking-wider mb-1 flex items-center justify-center gap-1">
+                      <Clock className="h-3 w-3" /> Carga
+                    </p>
+                    <p className="text-3xl font-black text-blue-400">{sheetData.ch}h</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de alunos */}
+              <div className="border-t border-slate-800 pt-5">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  📋 Lista de Alunos ({sheetData.alunos.length})
+                </p>
+                <ul className="space-y-2">
+                  {sheetData.alunos.map((aluno, i) => (
+                    <li
+                      key={i}
+                      className="flex items-center gap-3 text-sm text-slate-300 bg-slate-900/50 px-3 py-2.5 rounded-lg border border-slate-800/50"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                      {aluno}
+                    </li>
+                  ))}
+                  {sheetData.alunos.length === 0 && (
+                    <li className="text-sm text-slate-500 italic text-center py-4">Nenhum aluno vinculado.</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-48 text-slate-500 text-sm">
+              Carregando dados...
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* ── HEADER & FILTROS ── */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-lg backdrop-blur-sm relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent pointer-events-none" />
 
@@ -347,9 +507,7 @@ function Dashboard() {
             <SelectContent className="max-h-80">
               <SelectItem value="all">Todos os Meses</SelectItem>
               {dynamicMesesFiltro.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
+                <SelectItem key={m} value={m}>{m}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -361,9 +519,7 @@ function Dashboard() {
             <SelectContent className="max-h-80">
               <SelectItem value="all">Todas as Unidades</SelectItem>
               {dynamicUnidadesFiltro.map((u) => (
-                <SelectItem key={u.id} value={u.id}>
-                  {u.nome}
-                </SelectItem>
+                <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -375,9 +531,7 @@ function Dashboard() {
             <SelectContent className="max-h-80">
               <SelectItem value="all">Todas as Especialidades</SelectItem>
               {dynamicEspecialidadesFiltro.map((e) => (
-                <SelectItem key={e.id} value={e.id}>
-                  {e.nome}
-                </SelectItem>
+                <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -389,15 +543,14 @@ function Dashboard() {
             <SelectContent className="max-h-80">
               <SelectItem value="all">Todos os Preceptores</SelectItem>
               {dynamicPreceptoresFiltro.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.nome}
-                </SelectItem>
+                <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </div>
 
+      {/* Sync status */}
       <div className="flex items-center justify-end gap-2 text-xs text-slate-400 -mt-2 pr-2">
         {loading ? (
           <span className="flex items-center gap-1.5">
@@ -411,19 +564,13 @@ function Dashboard() {
         <span className="opacity-50">Última atualização: {lastUpdate.toLocaleTimeString()}</span>
       </div>
 
-      {/* ── KPIs MAINS ── */}
+      {/* ── KPIs ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <Stat icon={Users} value={totalAlunos} label="Alunos" hint="vinculados ativos" />
         <Stat icon={Stethoscope} value={totalPreceptores} label="Preceptores" hint="com vínculos" />
-        <Stat
-          icon={Activity}
-          value={mediaAlunosPreceptor}
-          label="Média"
-          hint="Alunos/Preceptor"
-          isRatio
-        />
+        <Stat icon={Activity} value={mediaAlunosPreceptor} label="Média" hint="Alunos/Preceptor" isRatio />
         <Stat icon={Building2} value={totalUnidades} label="Unidades" hint="com alunos alocados" />
-        <Stat icon={Clock} value={horasConcluidas} label="Horas" hint="carga horária da agenda" />
+        <Stat icon={Clock} value={0} label="Horas" hint="carga horária da agenda" />
       </div>
 
       {/* ── ALERTAS ── */}
@@ -445,14 +592,9 @@ function Dashboard() {
             ) : (
               <div className="space-y-2">
                 {alertasPreceptor.map((p, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between items-center text-sm p-2 rounded bg-red-900/20"
-                  >
-                    <span className="font-medium text-slate-800 dark:text-slate-200">{p.nome}</span>
-                    <span className="text-red-600 dark:text-red-400 font-bold">
-                      {p.alunos} alunos
-                    </span>
+                  <div key={i} className="flex items-center justify-between text-sm px-3 py-2 bg-red-900/10 rounded-lg border border-red-900/20">
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{p.nome}</span>
+                    <Badge variant="destructive" className="text-xs">{p.alunos} alunos</Badge>
                   </div>
                 ))}
               </div>
@@ -461,106 +603,16 @@ function Dashboard() {
         </Card>
       </div>
 
-      {/* ── PAINEL DE DETALHAMENTO (POWER BI STYLE) ── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl relative mt-2 min-h-[160px] flex flex-col justify-center overflow-hidden">
-        {selectedPreceptor === "all" ? (
-          <div className="text-center text-slate-400 py-12 animate-in fade-in px-6">
-            <p className="text-lg flex items-center justify-center gap-3">
-              <span className="text-3xl animate-pulse">💡</span> 
-              <span>Selecione um preceptor no filtro ou <strong>clique em sua barra no gráfico</strong> para visualizar o detalhamento operacional</span>
-            </p>
-          </div>
-        ) : (
-          <div className="p-6 animate-in zoom-in-95 duration-200">
-            {(() => {
-              const pData = rankingDataFull.find(p => p.id === selectedPreceptor);
-              if (!pData) return <p className="text-slate-400 text-center">Dados não encontrados para os filtros atuais.</p>;
-              
-              return (
-                <div className="flex flex-col lg:flex-row gap-8">
-                  {/* Coluna Esquerda: Informações Gerais */}
-                  <div className="space-y-5 flex-1">
-                    <h2 className="text-2xl font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-                      <Stethoscope className="h-6 w-6 text-emerald-400" /> {pData.preceptor}
-                    </h2>
-                    
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-2">
-                        <Building2 className="h-4 w-4 text-slate-500 mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-0.5">Unidade Hospitalar</p>
-                          <p className="text-sm text-slate-300">{pData.unidades.join(', ') || "Nenhuma"}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start gap-2">
-                        <Activity className="h-4 w-4 text-slate-500 mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-0.5">Especialidade</p>
-                          <p className="text-sm text-slate-300">{pData.text_especialidade}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start gap-2">
-                        <Clock className="h-4 w-4 text-slate-500 mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-0.5">Turno/Horário</p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {pData.turnos.map(t => <Badge key={t} variant="secondary" className="bg-slate-800 text-slate-300 border-none">{t}</Badge>)}
-                            {pData.turnos.length === 0 && <span className="text-sm text-slate-500">Não informado</span>}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700/50 inline-flex flex-col items-center justify-center min-w-[150px]">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Carga Horária Total</p>
-                      <p className="text-3xl font-black text-blue-400">{Math.round(pData.ch_total)}h</p>
-                    </div>
-                  </div>
-                  
-                  {/* Coluna Direita: Escala de Alunos */}
-                  <div className="flex-1 bg-slate-950/50 rounded-lg border border-slate-800 p-5">
-                    <div className="flex items-center justify-between mb-4 border-b border-slate-800/50 pb-2">
-                      <p className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                        <Users className="h-4 w-4" /> Escala de Alunos
-                      </p>
-                      <Badge variant="outline" className="bg-emerald-950/30 text-emerald-400 border-emerald-900">
-                        {pData.alunos} {pData.alunos === 1 ? 'vinculado' : 'vinculados'}
-                      </Badge>
-                    </div>
-                    
-                    {pData.listaAlunos.length > 0 ? (
-                      <div className="flex flex-wrap gap-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-2">
-                        {pData.listaAlunos.map(aluno => (
-                          <Badge key={aluno} variant="outline" className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700 py-1.5 px-3">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 inline-block"></span>
-                            {aluno}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-500 italic flex items-center justify-center h-20">
-                        Nenhum aluno vinculado.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-      </div>
-
       {/* ── GRÁFICOS ── */}
       <div className="grid lg:grid-cols-3 gap-6">
+        {/* Ranking Preceptores — clicável */}
         <Card className="lg:col-span-2 shadow-md border-white/10 dark:bg-slate-900/40">
           <CardHeader>
             <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200">
               Ranking de Preceptores (Top 10)
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Distribuição atual de alunos alocados por preceptor
+              Clique em uma barra para abrir o Raio-X do Preceptor
             </p>
           </CardHeader>
           <CardContent>
@@ -571,6 +623,8 @@ function Dashboard() {
                     data={rankingData}
                     layout="vertical"
                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    onClick={handleBarClick}
+                    style={{ cursor: "pointer" }}
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
@@ -595,7 +649,7 @@ function Dashboard() {
                       axisLine={false}
                     />
                     <Tooltip
-                      cursor={{ fill: "rgba(100, 116, 139, 0.1)" }}
+                      cursor={{ fill: "rgba(100, 116, 139, 0.15)" }}
                       content={({ active, payload, label }) => {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
@@ -603,36 +657,30 @@ function Dashboard() {
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 shadow-lg max-w-xs">
                               <p className="text-slate-800 dark:text-slate-200 font-bold mb-2 border-b border-slate-100 dark:border-slate-800 pb-1">{label}</p>
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Alunos Vinculados</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Alunos</span>
                                 <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 rounded">
                                   {data.alunos}
                                 </span>
                               </div>
                               {data.text_especialidade && (
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Especialidade</span>
-                                  <span className="text-slate-700 dark:text-slate-300 font-medium text-[11px] text-right truncate max-w-[140px]" title={data.text_especialidade}>
-                                    {data.text_especialidade}
-                                  </span>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[10px] text-slate-500 uppercase font-bold">Especialidade</span>
+                                  <span className="text-slate-600 dark:text-slate-300 text-[11px] truncate max-w-[140px]">{data.text_especialidade}</span>
                                 </div>
                               )}
-                              {data.turnos && data.turnos.length > 0 && (
-                                <div className="mt-2 space-y-1">
-                                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Escala / Turnos</span>
-                                  {data.turnos.map((t: string, i: number) => (
-                                    <div key={i} className="text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/50 px-2 py-1 rounded">
-                                      {t}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              <p className="text-[10px] text-slate-400 italic mt-2">Clique para ver Raio-X</p>
                             </div>
                           );
                         }
                         return null;
                       }}
                     />
-                    <Bar dataKey="alunos" fill="#10b981" radius={[0, 4, 4, 0]} maxBarSize={40} />
+                    <Bar
+                      dataKey="alunos"
+                      fill="#10b981"
+                      radius={[0, 4, 4, 0]}
+                      maxBarSize={40}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </ClientOnly>
@@ -640,6 +688,7 @@ function Dashboard() {
           </CardContent>
         </Card>
 
+        {/* Pizza Especialidades */}
         <Card className="shadow-md border-white/10 dark:bg-slate-900/40">
           <CardHeader>
             <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200">
@@ -680,25 +729,85 @@ function Dashboard() {
             <div className="grid grid-cols-2 gap-x-2 gap-y-1 w-full mt-4">
               {especialidadeData.slice(0, 4).map((entry, index) => (
                 <div key={index} className="flex items-center text-xs">
-                  <div
-                    className="w-2 h-2 rounded-full mr-2"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                  />
-                  <span
-                    className="truncate text-slate-600 dark:text-slate-300 flex-1"
-                    title={entry.name}
-                  >
-                    {entry.name}
-                  </span>
-                  <span className="font-bold text-slate-800 dark:text-slate-100 ml-1">
-                    {entry.value}
-                  </span>
+                  <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                  <span className="truncate text-slate-600 dark:text-slate-300 flex-1" title={entry.name}>{entry.name}</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-100 ml-1">{entry.value}</span>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* ── TABELA: DISTRIBUIÇÃO ACADÊMICA ── */}
+      <Card className="shadow-md border-white/10 dark:bg-slate-900/40 overflow-hidden">
+        <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+          <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-200">
+            Distribuição Acadêmica
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Cruzamento em tempo real de Unidades · Especialidades · Preceptores · Alunos
+          </p>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="max-h-[420px] overflow-y-auto">
+            <Table>
+              <TableHeader className="bg-slate-50 dark:bg-slate-900/80 sticky top-0 z-10">
+                <TableRow>
+                  <TableHead className="font-bold text-slate-700 dark:text-slate-300">Unidade</TableHead>
+                  <TableHead className="font-bold text-slate-700 dark:text-slate-300">Especialidade</TableHead>
+                  <TableHead className="font-bold text-slate-700 dark:text-slate-300">Preceptor</TableHead>
+                  <TableHead className="font-bold text-center text-slate-700 dark:text-slate-300">Alunos</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {[...Array(4)].map((_, j) => (
+                        <TableCell key={j}>
+                          <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : distribuicaoData.length > 0 ? (
+                  distribuicaoData.map((d, idx) => (
+                    <TableRow
+                      key={idx}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    >
+                      <TableCell className="font-medium text-slate-700 dark:text-slate-300">{d.unidade}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 font-medium"
+                        >
+                          {d.especialidade}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-slate-700 dark:text-slate-300">{d.preceptor}</TableCell>
+                      <TableCell className="text-center">
+                        <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold text-sm">
+                          {d.qtdAlunos}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                      Nenhum dado encontrado para os filtros selecionados.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
+
+export default Dashboard;
