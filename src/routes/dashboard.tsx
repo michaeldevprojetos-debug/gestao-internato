@@ -179,7 +179,7 @@ function Dashboard() {
     const aUni = Array.from(unidadeMap.values()).filter(u => u.count.size > limiteUnidade).map(u => ({ nome: u.nome, alunos: u.count.size }));
 
     return {
-      totalAlunos: alunosSet.size,
+      totalAlunos: filteredAloc.length,
       totalPreceptores: preceptoresSet.size,
       totalUnidades: unidadesSet.size,
       rankingData: rData,
@@ -269,8 +269,8 @@ function Dashboard() {
       </div>
 
       {/* ── ALERTAS ── */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card className="border-red-900/50 bg-red-950/10 dark:bg-red-950/20">
+      <div className="grid grid-cols-1 gap-4">
+        <Card className="border-red-900/50 bg-red-950/10 dark:bg-red-950/20 w-full">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-bold flex items-center gap-2 text-red-500">
               <AlertTriangle className="h-4 w-4" /> Alerta: Preceptores
@@ -288,31 +288,6 @@ function Dashboard() {
                   <div key={i} className="flex justify-between items-center text-sm p-2 rounded bg-red-900/20">
                     <span className="font-medium text-slate-800 dark:text-slate-200">{p.nome}</span>
                     <span className="text-red-600 dark:text-red-400 font-bold">{p.alunos} alunos</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-900/50 bg-orange-950/10 dark:bg-orange-950/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2 text-orange-500">
-              <AlertTriangle className="h-4 w-4" /> Alerta: Unidades
-              <span className="ml-auto text-[10px] uppercase bg-orange-900/40 px-2 py-0.5 rounded text-orange-400">
-                Acima de {limiteUnidade} alunos
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {alertasUnidade.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">Nenhuma unidade sobrecarregada.</p>
-            ) : (
-              <div className="space-y-2">
-                {alertasUnidade.map((u, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm p-2 rounded bg-orange-900/20">
-                    <span className="font-medium text-slate-800 dark:text-slate-200">{u.nome}</span>
-                    <span className="text-orange-600 dark:text-orange-400 font-bold">{u.alunos} alunos</span>
                   </div>
                 ))}
               </div>

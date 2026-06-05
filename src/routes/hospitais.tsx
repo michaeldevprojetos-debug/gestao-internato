@@ -184,7 +184,7 @@ function HospitaisPage() {
       // 2. Todos os preceptores
       const { data: preceptoresData, error: err2 } = await supabase
         .from("preceptores")
-        .select("id, nome, especialidade")
+        .select("id, nome, especialidade, local_id")
         .order("nome");
       if (err2) throw err2;
 
@@ -737,10 +737,13 @@ function PreceptorCard({
             {p.alunosCount}
           </Badge>
           {students.length > 0 && (
-            <span className="text-muted-foreground">
-              {" "}
-              — ({students.map((s) => s.aluno_nome).join(", ")})
-            </span>
+            <div className="flex flex-wrap gap-1 mt-2">
+              {students.map((s, idx) => (
+                <Badge key={idx} variant="outline" className="text-[10px] bg-slate-100 dark:bg-slate-800">
+                  {s.aluno_nome}
+                </Badge>
+              ))}
+            </div>
           )}
         </div>
 
