@@ -22,6 +22,8 @@ import {
   CartesianGrid,
 } from "recharts";
 import { ClientOnly } from "@/components/client-only";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Users,
   Stethoscope,
@@ -31,6 +33,8 @@ import {
   AlertTriangle,
   RefreshCw,
   CheckCircle2,
+  User,
+  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemConfig } from "@/hooks/use-system-config";
@@ -100,6 +104,7 @@ function Dashboard() {
   const [selectedEspecialidade, setSelectedEspecialidade] = useState<string>("all");
   const [selectedPreceptor, setSelectedPreceptor] = useState<string>("all");
   const [selectedMes, setSelectedMes] = useState<string>("all");
+  const [detailedPreceptorName, setDetailedPreceptorName] = useState<string | null>(null);
 
   const { data: dashboardData, isLoading: loading } = useQuery({
     queryKey: ["dashboardData"],
@@ -178,14 +183,17 @@ function Dashboard() {
     alertasPreceptor,
     alertasUnidade,
     custoAcumulado,
+    rankingDataFull,
+    distribuicaoData,
   } = useMemo(() => {
     const alunosSet = new Set<string>();
     const preceptoresSet = new Set<string>();
     const unidadesSet = new Set<string>();
 
-    const preceptorMap = new Map<string, { nome: string; count: Set<string>; turnos: Set<string>; especialidades: Set<string> }>();
+    const preceptorMap = new Map<string, { nome: string; count: Set<string>; listaAlunos: Set<string>; turnos: Set<string>; especialidades: Set<string>; unidades: Set<string>; ch_total: number }>();
     const especialidadeMap = new Map<string, Set<string>>();
     const unidadeMap = new Map<string, { nome: string; count: Set<string> }>();
+    const distribuicaoMap = new Map<string, { unidade: string; especialidade: string; preceptor: string; alunos: Set<string> }>();
     let custoAcumulado = 0;
 
     for (const a of filteredAloc) {
@@ -202,15 +210,24 @@ function Dashboard() {
           preceptorMap.set(a.preceptor_id, {
             nome: a.preceptor || "Desconhecido",
             count: new Set(),
+            listaAlunos: new Set(),
             turnos: new Set(),
             especialidades: new Set(),
+            unidades: new Set(),
+            ch_total: 0,
           });
         }
-        if (a.aluno) preceptorMap.get(a.preceptor_id)!.count.add(a.aluno);
+        const pObj = preceptorMap.get(a.preceptor_id)!;
+        if (a.aluno) {
+          pObj.count.add(a.aluno);
+          pObj.listaAlunos.add(a.aluno);
+        }
         const pEsp = a.text_especialidade || a.especialidade;
-        if (pEsp && pEsp !== "Sem Especialidade") preceptorMap.get(a.preceptor_id)!.especialidades.add(pEsp);
+        if (pEsp && pEsp !== "Sem Especialidade") pObj.especialidades.add(pEsp);
+        if (a.unidade) pObj.unidades.add(a.unidade);
         
-        // Add turno string
+        pObj.ch_total += Number(a.ch_prevista || a.carga_horaria || 0) / Number(a.qtd_alunos_alocacao || 1);
+        
         if (a.hora_inicio && a.hora_fim) {
           const h = parseInt(a.hora_inicio.split(":")[0], 10);
           let turnoLabel = "";
@@ -219,8 +236,22 @@ function Dashboard() {
           else turnoLabel = "🌙 Noite";
           
           const timeLabel = `${turnoLabel} (${a.hora_inicio.slice(0, 5)} - ${a.hora_fim.slice(0, 5)})`;
-          preceptorMap.get(a.preceptor_id)!.turnos.add(timeLabel);
+          pObj.turnos.add(timeLabel);
         }
+      }
+      
+      // Distribuicao Academica
+      if (a.unidade && a.preceptor) {
+        const dKey = `${a.unidade}_${a.text_especialidade || a.especialidade}_${a.preceptor}`;
+        if (!distribuicaoMap.has(dKey)) {
+          distribuicaoMap.set(dKey, {
+            unidade: a.unidade,
+            especialidade: a.text_especialidade || a.especialidade || "Sem Especialidade",
+            preceptor: a.preceptor,
+            alunos: new Set()
+          });
+        }
+        if (a.aluno) distribuicaoMap.get(dKey)!.alunos.add(a.aluno);
       }
 
       const espNome = a.text_especialidade || a.especialidade || "Sem Especialidade";
@@ -235,15 +266,26 @@ function Dashboard() {
       }
     }
 
-    const rData = Array.from(preceptorMap.values())
+    const rankingDataFull = Array.from(preceptorMap.values())
       .map((p) => ({ 
         preceptor: p.nome, 
         alunos: p.count.size,
         turnos: Array.from(p.turnos),
-        text_especialidade: Array.from(p.especialidades).join(', ') || "Sem Especialidade"
+        text_especialidade: Array.from(p.especialidades).join(', ') || "Sem Especialidade",
+        unidades: Array.from(p.unidades),
+        ch_total: p.ch_total,
+        listaAlunos: Array.from(p.listaAlunos)
       }))
-      .sort((a, b) => b.alunos - a.alunos)
-      .slice(0, 10);
+      .sort((a, b) => b.alunos - a.alunos);
+      
+    const rData = rankingDataFull.slice(0, 10);
+    
+    const dData = Array.from(distribuicaoMap.values()).map(d => ({
+      unidade: d.unidade,
+      especialidade: d.especialidade,
+      preceptor: d.preceptor,
+      alunos: d.alunos.size
+    })).sort((a, b) => a.unidade.localeCompare(b.unidade) || b.alunos - a.alunos);
 
     const eData = Array.from(especialidadeMap.entries())
       .map(([name, set]) => ({ name, value: set.size }))
@@ -261,6 +303,8 @@ function Dashboard() {
       totalPreceptores: preceptoresSet.size,
       totalUnidades: unidadesSet.size,
       rankingData: rData,
+      rankingDataFull,
+      distribuicaoData: dData,
       especialidadeData: eData,
       alertasPreceptor: aPrec,
       alertasUnidade: aUni,
@@ -412,6 +456,76 @@ function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── PAINEL DE DETALHAMENTO (POWER BI STYLE) ── */}
+      {detailedPreceptorName && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl relative animate-in zoom-in-95 duration-200 mt-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute top-4 right-4 text-slate-400 hover:text-white hover:bg-slate-800"
+            onClick={() => setDetailedPreceptorName(null)}
+          >
+            <X className="h-5 w-5" />
+          </Button>
+          
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <User className="h-5 w-5 text-emerald-400" /> Detalhamento Operacional: {detailedPreceptorName}
+          </h2>
+          
+          {(() => {
+            const pData = rankingDataFull.find(p => p.preceptor === detailedPreceptorName);
+            if (!pData) return <p className="text-slate-400">Dados não encontrados para os filtros atuais.</p>;
+            
+            return (
+              <div className="flex flex-col lg:flex-row gap-8">
+                <div className="space-y-4 flex-1">
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">🏥 Unidade(s)</p>
+                    <p className="text-sm text-slate-300">{pData.unidades.join(', ') || "Nenhuma"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">🩺 Especialidade(s)</p>
+                    <p className="text-sm text-slate-300">{pData.text_especialidade}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">🕐 Escala / Turno</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {pData.turnos.map(t => <Badge key={t} variant="secondary" className="bg-slate-800 text-slate-300 border-none">{t}</Badge>)}
+                      {pData.turnos.length === 0 && <span className="text-sm text-slate-500">Não informado</span>}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700/50 flex flex-col items-center justify-center">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">👨‍🎓 Alunos Totais</p>
+                      <p className="text-3xl font-black text-emerald-400">{pData.alunos}</p>
+                    </div>
+                    <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700/50 flex flex-col items-center justify-center">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">⏱ Carga Horária</p>
+                      <p className="text-3xl font-black text-blue-400">{Math.round(pData.ch_total)}h</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex-1 bg-slate-950/50 rounded-lg border border-slate-800 p-4 max-h-[300px] overflow-y-auto custom-scrollbar">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 sticky top-0 bg-slate-950/90 py-1 backdrop-blur-sm z-10">Lista de Alunos Vinculados ({pData.listaAlunos.length})</p>
+                  {pData.listaAlunos.length > 0 ? (
+                    <ul className="space-y-2">
+                      {pData.listaAlunos.map(aluno => (
+                        <li key={aluno} className="flex items-center gap-2 text-sm text-slate-300 bg-slate-900/50 p-2 rounded">
+                          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500"></div> {aluno}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-slate-500 italic">Nenhum aluno vinculado no filtro atual.</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* ── GRÁFICOS ── */}
       <div className="grid lg:grid-cols-3 gap-6">
