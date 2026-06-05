@@ -360,11 +360,38 @@ function Dashboard() {
     const especialidades = [...new Set(rows.map((r: any) => r.text_especialidade || r.especialidade).filter(Boolean))];
     const alunos = [...new Set(rows.map((r: any) => r.aluno).filter(Boolean))];
     const turnos = [...new Set(rows.map((r: any) => getTurnoLabel(r.hora_inicio, r.hora_fim)))];
-    const ch = rows.reduce((acc: number, r: any) => {
-      return acc + (Number(r.ch_prevista || r.carga_horaria || 0) / Number(r.qtd_alunos_alocacao || 1));
+    const chContratada = rows.reduce((acc: number, r: any) => {
+      let calc_ch = Number(r.ch_prevista || r.carga_horaria || 0);
+      
+      if (calc_ch === 0 && r.data_inicio && r.data_fim && r.hora_inicio && r.hora_fim) {
+        try {
+          const start = new Date(r.data_inicio);
+          const end = new Date(r.data_fim);
+          if (end >= start) {
+            const diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            const [h1, m1] = r.hora_inicio.split(":").map(Number);
+            const [h2, m2] = r.hora_fim.split(":").map(Number);
+            let diffHours = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
+            if (diffHours < 0) diffHours += 24;
+            calc_ch = diffDays * diffHours;
+          }
+        } catch (e) {}
+      }
+      return acc + (calc_ch / Number(r.qtd_alunos_alocacao || 1));
     }, 0);
 
-    return { nome, unidades, especialidades, alunos, turnos, ch: Math.round(ch) };
+    const chRealizada = rows.reduce((acc: number, r: any) => {
+      return acc + (Number(r.horas_realizadas || 0) / Number(r.qtd_alunos_alocacao || 1));
+    }, 0);
+
+    const aproveitamento = chContratada > 0 ? Math.round((chRealizada / chContratada) * 100) : 0;
+
+    return { 
+      nome, unidades, especialidades, alunos, turnos, 
+      chContratada: Math.round(chContratada),
+      chRealizada: Math.round(chRealizada),
+      aproveitamento
+    };
   }, [sheetPreceptorId, alocacoes]);
 
   const mediaAlunosPreceptor =
@@ -437,17 +464,29 @@ function Dashboard() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-emerald-950/40 rounded-lg p-4 border border-emerald-900/40 text-center">
-                    <p className="text-xs text-emerald-400/70 font-bold uppercase tracking-wider mb-1 flex items-center justify-center gap-1">
+                  <div className="bg-emerald-950/40 rounded-lg p-4 border border-emerald-900/40 flex flex-col items-center justify-center">
+                    <p className="text-[10px] text-emerald-400/70 font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1">
                       <Users className="h-3 w-3" /> Alunos
                     </p>
-                    <p className="text-3xl font-black text-emerald-400">{sheetData.alunos.length}</p>
+                    <p className="text-2xl font-black text-emerald-400">{sheetData.alunos.length}</p>
                   </div>
-                  <div className="bg-blue-950/40 rounded-lg p-4 border border-blue-900/40 text-center">
-                    <p className="text-xs text-blue-400/70 font-bold uppercase tracking-wider mb-1 flex items-center justify-center gap-1">
-                      <Clock className="h-3 w-3" /> Carga
+                  <div className="bg-blue-950/40 rounded-lg p-4 border border-blue-900/40 flex flex-col items-center justify-center">
+                    <p className="text-[10px] text-blue-400/70 font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> CH Contratada
                     </p>
-                    <p className="text-3xl font-black text-blue-400">{sheetData.ch}h</p>
+                    <p className="text-2xl font-black text-blue-400">{sheetData.chContratada}h</p>
+                  </div>
+                  <div className="bg-indigo-950/40 rounded-lg p-4 border border-indigo-900/40 flex flex-col items-center justify-center">
+                    <p className="text-[10px] text-indigo-400/70 font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                      <Activity className="h-3 w-3" /> CH Realizada
+                    </p>
+                    <p className="text-2xl font-black text-indigo-400">{sheetData.chRealizada}h</p>
+                  </div>
+                  <div className="bg-purple-950/40 rounded-lg p-4 border border-purple-900/40 flex flex-col items-center justify-center">
+                    <p className="text-[10px] text-purple-400/70 font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Aproveitamento
+                    </p>
+                    <p className="text-2xl font-black text-purple-400">{sheetData.aproveitamento}%</p>
                   </div>
                 </div>
               </div>

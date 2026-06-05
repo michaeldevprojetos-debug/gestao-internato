@@ -1146,10 +1146,45 @@ function GerenciarUnidadeDialog({
   const [rotacoesOptions, setRotacoesOptions] = useState<{id: string, nome: string}[]>([]);
   
   useEffect(() => {
-    supabase.from("rotacoes" as any).select("id, nome").order("nome").then(({data}) => {
-       if(data) setRotacoesOptions(data);
-    });
-  }, []);
+      supabase.from("rotacoes" as any).select("id, nome").order("nome").then(({data}) => {
+        if (data) setRotacoesOptions(data);
+      });
+    }, []);
+
+    // Cálculo automático de CH Prevista
+    useEffect(() => {
+      if (!dataInicio || !dataFim || !horaInicio || !horaFim) return;
+      try {
+        const start = new Date(dataInicio);
+        const end = new Date(dataFim);
+        if (end < start) return;
+        
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        
+        const [h1, m1] = horaInicio.split(":").map(Number);
+        const [h2, m2] = horaFim.split(":").map(Number);
+        
+        let diffHours = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
+        if (diffHours < 0) diffHours += 24;
+        
+        const chCalculada = Math.round(diffDays * diffHours);
+        
+        if (chCalculada > 0) {
+          setPreceptorChPrevista(prev => {
+            const newCh = { ...prev };
+            selectedPreceptores.forEach(tag => {
+              const key = tag.type === "existing" ? tag.id : tag.tempId;
+              // Preenche automaticamente o campo
+              newCh[key] = chCalculada;
+            });
+            return newCh;
+          });
+        }
+      } catch (e) {
+        // ignore
+      }
+    }, [dataInicio, dataFim, horaInicio, horaFim, selectedPreceptores]);
 
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");

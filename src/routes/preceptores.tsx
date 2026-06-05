@@ -108,7 +108,7 @@ function PreceptoresPage() {
   useEffect(() => {
     const term = query.toLowerCase();
     setFiltered(
-      preceptores.filter(
+      (preceptores || []).filter(
         (p) =>
           p.nome.toLowerCase().includes(term) ||
           (p.especialidade_nome && p.especialidade_nome.toLowerCase().includes(term)),
@@ -118,7 +118,7 @@ function PreceptoresPage() {
 
   const handleExport = () => {
     const headers = ["Nome", "Especialidade", "Status"];
-    const rows = filtered.map((p) => [
+    const rows = (filtered || []).map((p) => [
       p.nome,
       p.especialidade_nome || "—",
       p.ativo ? "Ativo" : "Inativo",
@@ -375,7 +375,7 @@ function PreceptorDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Nenhuma</SelectItem>
-                {especialidades.map((e) => (
+                {(especialidades || []).map((e) => (
                   <SelectItem key={e.id} value={e.id}>
                     {e.nome}
                   </SelectItem>
