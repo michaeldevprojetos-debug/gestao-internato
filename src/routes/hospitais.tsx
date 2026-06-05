@@ -65,7 +65,7 @@ type PreceptorSimple = {
   id: string;
   nome: string;
   especialidade: string | null;
-  local_id: string | null;
+  units?: string[];
 };
 
 type AlunoSimple = {
@@ -174,7 +174,7 @@ function HospitaisPage() {
     try {
       // 1. Todos os locais cadastrados
       const { data: locaisData, error: err1 } = await supabase
-        .from("locais")
+        .from("unidades")
         .select("id, nome, tipo")
         .order("nome");
       if (err1) throw err1;
@@ -184,11 +184,11 @@ function HospitaisPage() {
       // 2. Todos os preceptores
       const { data: preceptoresData, error: err2 } = await supabase
         .from("preceptores")
-        .select("id, nome, especialidade, local_id")
+        .select("id, nome, especialidade")
         .order("nome");
       if (err2) throw err2;
 
-      setAllPreceptores((preceptoresData ?? []) as PreceptorSimple[]);
+      
 
       // 3. Todos os alunos
       const { data: alunosData, error: errAlunos } = await supabase
@@ -207,8 +207,7 @@ function HospitaisPage() {
 
       // 4. Vínculos operacionais
       const { data: vinculosData, error: err3 } = await supabase
-        .from("vinculo_operacional")
-        .select("id, preceptor_id, aluno_id, quantidade_alunos, alunos ( nome, semestre )");
+        .from("alocacoes").select("id, preceptor_id, aluno_id, unidade_id, alunos ( nome, semestre )");
       if (err3) throw err3;
 
       type AlunoInfo = { id: string; nome: string; semestre: number | null };
@@ -322,7 +321,7 @@ function HospitaisPage() {
         .eq("local_id", localId);
       if (err1) throw err1;
 
-      const { error: err2 } = await supabase.from("locais").delete().eq("id", localId);
+      const { error: err2 } = await supabase.from("unidades").delete().eq("id", localId);
       if (err2) throw err2;
 
       toast.success(`Unidade "${localNome}" excluída com sucesso!`);
@@ -343,7 +342,7 @@ function HospitaisPage() {
     try {
       if (vinculoId) {
         const { error } = await supabase
-          .from("vinculo_operacional")
+          .from("alocacoes")
           .update({ quantidade_alunos: newValue })
           .eq("id", vinculoId);
         if (error) throw error;
@@ -1312,12 +1311,12 @@ function GerenciarUnidadeDialog({
         if (matchedLocal) {
           // Local já existe, usar o ID existente e atualizar tipo se necessário
           localId = matchedLocal.id;
-          const { error } = await supabase.from("locais").update({ tipo }).eq("id", localId);
+          const { error } = await supabase.from("unidades").update({ tipo }).eq("id", localId);
           if (error) throw error;
         } else {
           // Criar novo local
           const { data, error } = await supabase
-            .from("locais")
+            .from("unidades")
             .insert({ nome: nome.trim(), tipo })
             .select("id")
             .single();
@@ -1326,7 +1325,7 @@ function GerenciarUnidadeDialog({
         }
       } else {
         const { error } = await supabase
-          .from("locais")
+          .from("unidades")
           .update({ nome: nome.trim(), tipo })
           .eq("id", local!.id);
         if (error) throw error;
@@ -1380,7 +1379,7 @@ function GerenciarUnidadeDialog({
       if (local && local.preceptoresList.length > 0) {
         const preceptorIdsOfLocal = local.preceptoresList.map((p) => p.id);
         const { error: deleteError } = await supabase
-          .from("vinculo_operacional")
+          .from("alocacoes")
           .delete()
           .in("preceptor_id", preceptorIdsOfLocal);
         if (deleteError) throw deleteError;
@@ -1557,7 +1556,8 @@ function GerenciarUnidadeDialog({
               ) : (
                 visiblePreceptores.slice(0, 50).map((p) => {
                   const checked = isSelected(p.id);
-                  const otherLocal = p.local_id && p.local_id !== local?.id;
+                  // Se o preceptor tem vínculos (preceptorUnits.get(p.id)) e algum deles não é a unidade atual
+                  const otherLocal = p.units && p.units.length > 0 && p.units.some(uId => uId !== local?.id);
 
                   return (
                     <div

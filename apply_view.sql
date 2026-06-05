@@ -8,7 +8,13 @@ ALTER TABLE public.alocacoes ADD COLUMN IF NOT EXISTS carga_horaria INTEGER;
 -- 2. Limpa de forma absoluta qualquer registro fantasma para zerar os testes
 TRUNCATE TABLE public.alocacoes CASCADE;
 
--- 3. Recria a View de forma limpa acompanhando os novos campos de data
+-- 3. Garante que os IDs das unidades estejam consistentes
+ALTER TABLE public.alocacoes 
+  DROP CONSTRAINT IF EXISTS alocacoes_unidade_id_fkey,
+  ADD CONSTRAINT alocacoes_unidade_id_fkey 
+  FOREIGN KEY (unidade_id) REFERENCES public.unidades(id) ON DELETE CASCADE;
+
+-- 4. Recria a View de forma limpa acompanhando os novos campos de data
 DROP VIEW IF EXISTS public.vw_dashboard_preceptores CASCADE;
 CREATE OR REPLACE VIEW public.vw_dashboard_preceptores AS
 SELECT
@@ -28,8 +34,7 @@ SELECT
 FROM public.alocacoes al
 INNER JOIN public.alunos a ON a.id = al.aluno_id
 INNER JOIN public.preceptores p ON p.id = al.preceptor_id
-INNER JOIN public.unidades u ON u.id = al.unidade_id
-LEFT JOIN public.especialidades e ON e.id = al.especialidade_id;
+INNER JOIN public.unidades u ON u.id = al.unidade_id;
 
--- 4. Notifica o cache do Supabase para atualizar o Schema imediatamente
+-- 5. Notifica o cache do Supabase para atualizar o Schema imediatamente
 NOTIFY pgrst, 'reload schema';
