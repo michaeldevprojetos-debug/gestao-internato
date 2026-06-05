@@ -98,7 +98,7 @@ function Dashboard() {
       const [uRes, eRes, pRes] = await Promise.all([
         supabase.from("unidades").select("id, nome").eq("ativo", true).order("nome"),
         supabase.from("especialidades").select("id, nome").order("nome"),
-        supabase.from("preceptores").select("id, nome").eq("ativo", true).order("nome"),
+        supabase.from("preceptores").select("id, nome").order("nome"),
       ]);
       
       const { data: viewData, error } = await supabase
