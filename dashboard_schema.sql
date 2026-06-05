@@ -10,11 +10,43 @@ CREATE TABLE IF NOT EXISTS public.unidades (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Migrar dados de locais para unidades (mantém os mesmos IDs)
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'locais') THEN
+    INSERT INTO public.unidades (id, nome, tipo)
+    SELECT id, nome, tipo FROM public.locais
+    ON CONFLICT (nome) DO NOTHING;
+  END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS public.especialidades (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome TEXT NOT NULL UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Inserir especialidades obrigatórias
+INSERT INTO public.especialidades (nome) VALUES 
+  ('Clínica Médica'),
+  ('Cirurgia Geral'),
+  ('Pediatria'),
+  ('Ginecologia e Obstetrícia'),
+  ('Ortopedia'),
+  ('Cardiologia'),
+  ('Neurologia'),
+  ('Psiquiatria'),
+  ('Dermatologia'),
+  ('Oftalmologia'),
+  ('Otorrinolaringologia'),
+  ('Urologia'),
+  ('Anestesiologia'),
+  ('Medicina de Família'),
+  ('Saúde Mental'),
+  ('Emergência'),
+  ('Outra')
+ON CONFLICT (nome) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.preceptores (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,7 +78,73 @@ CREATE TABLE IF NOT EXISTS public.alocacoes (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Migrar vinculos_operacionais para alocacoes
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'vinculo_operacional') THEN
+    INSERT INTO public.alocacoes (aluno_id, preceptor_id, unidade_id, carga_horaria)
+    SELECT 
+      v.aluno_id, 
+      v.preceptor_id, 
+      p.local_id, 
+      v.horas_realizadas
+    FROM public.vinculo_operacional v
+    JOIN public.preceptores p ON p.id = v.preceptor_id
+    WHERE v.aluno_id IS NOT NULL AND v.preceptor_id IS NOT NULL
+    -- Considerando apenas registros mais recentes ou simplificando. A inserção não gera conflito único por padrão.
+    ON CONFLICT DO NOTHING;
+  END IF;
+END
+$$;
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- NOVO MÓDULO: AGENDA DE PRECEPTORIA
+-- ═══════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.agenda_preceptoria (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aluno_id UUID REFERENCES public.alunos(id) ON DELETE CASCADE,
+    preceptor_id UUID REFERENCES public.preceptores(id) ON DELETE CASCADE,
+    unidade_id UUID REFERENCES public.unidades(id) ON DELETE CASCADE,
+    especialidade_id UUID REFERENCES public.especialidades(id) ON DELETE SET NULL,
+    data DATE NOT NULL,
+    hora_inicio TIME NOT NULL,
+    hora_fim TIME NOT NULL,
+    status TEXT DEFAULT 'ativo' CHECK (status IN ('ativo', 'cancelado', 'concluído')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.agenda_preceptoria ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'agenda_preceptoria' AND policyname = 'Authenticated users can manage agenda') THEN
+    CREATE POLICY "Authenticated users can manage agenda"
+      ON public.agenda_preceptoria
+      FOR ALL
+      TO authenticated
+      USING (true)
+      WITH CHECK (true);
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'agenda_preceptoria' AND policyname = 'Anon users can manage agenda') THEN
+    CREATE POLICY "Anon users can manage agenda"
+      ON public.agenda_preceptoria
+      FOR ALL
+      TO anon
+      USING (true)
+      WITH CHECK (true);
+  END IF;
+END
+$$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
 -- ETAPA 1: TABELA DE CONFIGURAÇÕES (ÚNICA FONTE DE VERDADE)
+-- ═══════════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.configuracoes_sistema (
     chave TEXT PRIMARY KEY,
     valor TEXT NOT NULL,
@@ -59,70 +157,21 @@ VALUES
   ('limite_alunos_unidade', '20')
 ON CONFLICT (chave) DO NOTHING;
 
--- ═══════════════════════════════════════════════════════════════════════
--- RLS (Row Level Security) — CRÍTICO para que o frontend consiga ler/escrever
--- ═══════════════════════════════════════════════════════════════════════
-
--- Ativa RLS na tabela (seguro mas com policies permissivas para usuários autenticados)
 ALTER TABLE public.configuracoes_sistema ENABLE ROW LEVEL SECURITY;
 
--- Policy de SELECT: qualquer usuário autenticado pode ler configurações
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'configuracoes_sistema' AND policyname = 'Authenticated users can read config'
-  ) THEN
-    CREATE POLICY "Authenticated users can read config"
-      ON public.configuracoes_sistema
-      FOR SELECT
-      TO authenticated
-      USING (true);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'configuracoes_sistema' AND policyname = 'Authenticated users can read config') THEN
+    CREATE POLICY "Authenticated users can read config" ON public.configuracoes_sistema FOR SELECT TO authenticated USING (true);
   END IF;
-END
-$$;
-
--- Policy de UPDATE: qualquer usuário autenticado pode alterar configurações
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'configuracoes_sistema' AND policyname = 'Authenticated users can update config'
-  ) THEN
-    CREATE POLICY "Authenticated users can update config"
-      ON public.configuracoes_sistema
-      FOR UPDATE
-      TO authenticated
-      USING (true)
-      WITH CHECK (true);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'configuracoes_sistema' AND policyname = 'Authenticated users can update config') THEN
+    CREATE POLICY "Authenticated users can update config" ON public.configuracoes_sistema FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
   END IF;
-END
-$$;
-
--- Policy para anon (caso o site funcione sem login em algum cenário)
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'configuracoes_sistema' AND policyname = 'Anon users can read config'
-  ) THEN
-    CREATE POLICY "Anon users can read config"
-      ON public.configuracoes_sistema
-      FOR SELECT
-      TO anon
-      USING (true);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'configuracoes_sistema' AND policyname = 'Anon users can read config') THEN
+    CREATE POLICY "Anon users can read config" ON public.configuracoes_sistema FOR SELECT TO anon USING (true);
   END IF;
-END
-$$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'configuracoes_sistema' AND policyname = 'Anon users can update config'
-  ) THEN
-    CREATE POLICY "Anon users can update config"
-      ON public.configuracoes_sistema
-      FOR UPDATE
-      TO anon
-      USING (true)
-      WITH CHECK (true);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'configuracoes_sistema' AND policyname = 'Anon users can update config') THEN
+    CREATE POLICY "Anon users can update config" ON public.configuracoes_sistema FOR UPDATE TO anon USING (true) WITH CHECK (true);
   END IF;
 END
 $$;
@@ -150,19 +199,16 @@ INNER JOIN public.unidades u ON u.id = al.unidade_id
 LEFT JOIN public.especialidades e ON e.id = al.especialidade_id;
 
 -- ═══════════════════════════════════════════════════════════════════════
--- REALTIME (apenas tabela nova — alocacoes já está na publication)
+-- REALTIME
 -- ═══════════════════════════════════════════════════════════════════════
 
--- Adiciona configuracoes_sistema ao Realtime (se ainda não estiver)
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime'
-      AND tablename = 'configuracoes_sistema'
-  ) THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'configuracoes_sistema') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.configuracoes_sistema;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'agenda_preceptoria') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.agenda_preceptoria;
   END IF;
 END
 $$;

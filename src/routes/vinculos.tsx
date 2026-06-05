@@ -16,7 +16,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -32,156 +31,95 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { formatBRL } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/vinculos")({
-  head: () => ({ meta: [{ title: "Vínculos — Painel de Preceptoria" }] }),
+  head: () => ({ meta: [{ title: "Alocações — Painel de Preceptoria" }] }),
   component: VinculosPage,
 });
 
-// ─── Tipos derivados do schema real ───────────────────────────────────────────
-
-type VinculoRow = {
+type AlocacaoRow = {
   id: string;
-  mes_referencia: string;
-  horas_realizadas: number | null;
-  valor_hora_preceptor: number | null;
-  custo_total_rotacao: number | null;
-  aluno_id: string | null;
-  preceptor_id: string | null;
-  rotacao_id: string | null;
-  // Nomes resolvidos via join
-  aluno_nome?: string;
-  aluno_semestre?: number | null;
-  preceptor_nome?: string;
-  preceptor_especialidade?: string | null;
-  preceptor_unidade?: string | null;
-  rotacao_nome?: string;
+  data_inicio: string;
+  data_fim: string | null;
+  aluno_id: string;
+  preceptor_id: string;
+  unidade_id: string;
+  especialidade_id: string | null;
+  aluno_nome: string;
+  preceptor_nome: string;
+  unidade_nome: string;
+  especialidade_nome: string | null;
 };
-
-type AlunoRef = { id: string; nome: string; semestre: number | null };
-type PreceptorRef = {
-  id: string;
-  nome: string;
-  especialidade: string | null;
-  unidade_vinculada: string | null;
-  valor_hora: number | null;
-};
-type RotacaoRef = { id: string; nome: string };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatMes(m: string) {
-  const [y, mm] = m.split("-");
-  const nomes = [
-    "Jan",
-    "Fev",
-    "Mar",
-    "Abr",
-    "Mai",
-    "Jun",
-    "Jul",
-    "Ago",
-    "Set",
-    "Out",
-    "Nov",
-    "Dez",
-  ];
-  return `${nomes[parseInt(mm) - 1]}/${y.slice(2)}`;
-}
-
-// ─── Página principal ─────────────────────────────────────────────────────────
 
 function VinculosPage() {
-  const [vinculos, setVinculos] = useState<VinculoRow[]>([]);
-  const [alunos, setAlunos] = useState<AlunoRef[]>([]);
-  const [preceptores, setPreceptores] = useState<PreceptorRef[]>([]);
-  const [rotacoes, setRotacoes] = useState<RotacaoRef[]>([]);
+  const [alocacoes, setAlocacoes] = useState<AlocacaoRow[]>([]);
+  const [alunos, setAlunos] = useState<any[]>([]);
+  const [preceptores, setPreceptores] = useState<any[]>([]);
+  const [unidades, setUnidades] = useState<any[]>([]);
+  const [especialidades, setEspecialidades] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<VinculoRow | null>(null);
+  const [editing, setEditing] = useState<AlocacaoRow | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // ── Carrega vínculos com join manual ────────────────────────────────────────
-  const fetchVinculos = useCallback(async () => {
+  const fetchAlocacoes = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const { data, error: err } = await supabase
-        .from("vinculo_operacional")
-        .select(
-          `
-          id,
-          mes_referencia,
-          horas_realizadas,
-          valor_hora_preceptor,
-          custo_total_rotacao,
-          aluno_id,
-          preceptor_id,
-          rotacao_id,
-          alunos ( nome, semestre ),
-          preceptores ( nome, especialidade, unidade_vinculada ),
-          rotacoes ( nome )
-        `,
-        )
-        .order("mes_referencia", { ascending: false });
+        .from("alocacoes" as any)
+        .select(`
+          id, data_inicio, data_fim, aluno_id, preceptor_id, unidade_id, especialidade_id,
+          alunos(nome), preceptores(nome), unidades(nome), especialidades(nome)
+        `)
+        .order("data_inicio", { ascending: false });
 
       if (err) throw err;
 
-      const mapped: VinculoRow[] = (data ?? []).map((v: any) => ({
-        id: v.id,
-        mes_referencia: v.mes_referencia,
-        horas_realizadas: v.horas_realizadas,
-        valor_hora_preceptor: v.valor_hora_preceptor,
-        custo_total_rotacao: v.custo_total_rotacao,
-        aluno_id: v.aluno_id,
-        preceptor_id: v.preceptor_id,
-        rotacao_id: v.rotacao_id,
-        aluno_nome: v.alunos?.nome ?? "—",
-        aluno_semestre: v.alunos?.semestre ?? null,
-        preceptor_nome: v.preceptores?.nome ?? "—",
-        preceptor_especialidade: v.preceptores?.especialidade ?? null,
-        preceptor_unidade: v.preceptores?.unidade_vinculada ?? null,
-        rotacao_nome: v.rotacoes?.nome ?? "—",
-      }));
-
-      setVinculos(mapped);
+      setAlocacoes(
+        (data || []).map((v: any) => ({
+          id: v.id,
+          data_inicio: v.data_inicio,
+          data_fim: v.data_fim,
+          aluno_id: v.aluno_id,
+          preceptor_id: v.preceptor_id,
+          unidade_id: v.unidade_id,
+          especialidade_id: v.especialidade_id,
+          aluno_nome: v.alunos?.nome ?? "—",
+          preceptor_nome: v.preceptores?.nome ?? "—",
+          unidade_nome: v.unidades?.nome ?? "—",
+          especialidade_nome: v.especialidades?.nome ?? null,
+        }))
+      );
     } catch (e: any) {
-      setError(e?.message ?? "Erro ao carregar vínculos.");
+      setError(e?.message ?? "Erro ao carregar alocações.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // ── Carrega listas de referência para o formulário ───────────────────────────
   useEffect(() => {
-    fetchVinculos();
-
+    fetchAlocacoes();
     Promise.all([
-      supabase.from("alunos").select("id, nome, semestre").eq("status", "Ativo").order("nome"),
-      supabase
-        .from("preceptores")
-        .select("id, nome, especialidade, unidade_vinculada, valor_hora")
-        .order("nome"),
-      supabase.from("rotacoes").select("id, nome").order("nome"),
-    ]).then(([a, p, r]) => {
+      supabase.from("alunos").select("id, nome").eq("status", "Ativo").order("nome"),
+      supabase.from("preceptores" as any).select("id, nome").order("nome"),
+      supabase.from("unidades" as any).select("id, nome").order("nome"),
+      supabase.from("especialidades" as any).select("id, nome").order("nome"),
+    ]).then(([a, p, u, e]) => {
       if (!a.error) setAlunos(a.data ?? []);
       if (!p.error) setPreceptores(p.data ?? []);
-      if (!r.error) setRotacoes(r.data ?? []);
+      if (!u.error) setUnidades(u.data ?? []);
+      if (!e.error) setEspecialidades(e.data ?? []);
     });
-  }, [fetchVinculos]);
+  }, [fetchAlocacoes]);
 
-  // ── Deletar ──────────────────────────────────────────────────────────────────
   async function handleDelete(id: string, aluno: string) {
-    if (!confirm(`Excluir o vínculo de "${aluno}"? Esta ação não pode ser desfeita.`)) return;
-
-    const { error: err } = await supabase.from("vinculo_operacional").delete().eq("id", id);
-
-    if (err) {
-      toast.error("Erro ao excluir vínculo: " + err.message);
-    } else {
-      toast.success("Vínculo excluído com sucesso.");
-      setVinculos((prev) => prev.filter((v) => v.id !== id));
+    if (!confirm(`Excluir a alocação de "${aluno}"?`)) return;
+    const { error: err } = await supabase.from("alocacoes" as any).delete().eq("id", id);
+    if (err) toast.error("Erro: " + err.message);
+    else {
+      toast.success("Alocação excluída.");
+      fetchAlocacoes();
     }
   }
 
@@ -189,33 +127,20 @@ function VinculosPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Vínculo Operacional</h1>
-          <p className="text-sm text-muted-foreground">
-            Lançamentos mensais de horas e custo realizado.{" "}
-            {!loading && !error && (
-              <span className="font-medium text-foreground">{vinculos.length} registros</span>
-            )}
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Alocações Acadêmicas</h1>
+          <p className="text-sm text-muted-foreground">Distribuição de alunos por preceptor e unidade.</p>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setDialogOpen(true);
-          }}
-        >
+        <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
           <Plus className="mr-2 h-4 w-4" />
-          Novo Vínculo
+          Nova Alocação
         </Button>
       </div>
 
-      {/* ── Estado de erro ── */}
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
-          <Button variant="ghost" size="sm" className="ml-auto h-7" onClick={fetchVinculos}>
-            Tentar novamente
-          </Button>
+          <Button variant="ghost" size="sm" className="ml-auto h-7" onClick={fetchAlocacoes}>Tentar novamente</Button>
         </div>
       )}
 
@@ -224,78 +149,45 @@ function VinculosPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Mês</TableHead>
+                <TableHead>Início</TableHead>
+                <TableHead>Fim</TableHead>
                 <TableHead>Aluno</TableHead>
-                <TableHead>Sem.</TableHead>
-                <TableHead>Rotação / Especialidade</TableHead>
-                <TableHead>Unidade</TableHead>
                 <TableHead>Preceptor</TableHead>
-                <TableHead className="text-right">Horas</TableHead>
-                <TableHead className="text-right">Valor/h</TableHead>
-                <TableHead className="text-right">Custo Total</TableHead>
+                <TableHead>Unidade</TableHead>
+                <TableHead>Especialidade</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
+                Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 10 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
+                    {Array.from({ length: 7 }).map((__, j) => (
+                      <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
-              ) : vinculos.length === 0 ? (
+              ) : alocacoes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-12 text-center text-muted-foreground">
-                    Nenhum vínculo encontrado. Clique em "Novo Vínculo" para começar.
-                  </TableCell>
+                  <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">Nenhuma alocação encontrada.</TableCell>
                 </TableRow>
               ) : (
-                vinculos.map((v) => (
+                alocacoes.map((v) => (
                   <TableRow key={v.id}>
-                    <TableCell className="font-medium">{formatMes(v.mes_referencia)}</TableCell>
+                    <TableCell>{new Date(v.data_inicio).toLocaleDateString("pt-BR")}</TableCell>
+                    <TableCell>{v.data_fim ? new Date(v.data_fim).toLocaleDateString("pt-BR") : "Vigente"}</TableCell>
                     <TableCell className="font-medium">{v.aluno_nome}</TableCell>
-                    <TableCell>{v.aluno_semestre ? `${v.aluno_semestre}º` : "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{v.rotacao_nome}</Badge>
-                    </TableCell>
-                    <TableCell
-                      className="text-muted-foreground text-xs max-w-[140px] truncate"
-                      title={v.preceptor_unidade ?? ""}
-                    >
-                      {v.preceptor_unidade ?? "—"}
-                    </TableCell>
                     <TableCell>{v.preceptor_nome}</TableCell>
-                    <TableCell className="text-right">{v.horas_realizadas ?? 0}h</TableCell>
-                    <TableCell className="text-right">
-                      {formatBRL(v.valor_hora_preceptor ?? 0)}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {formatBRL(v.custo_total_rotacao ?? 0)}
+                    <TableCell className="text-muted-foreground">{v.unidade_nome}</TableCell>
+                    <TableCell>
+                      {v.especialidade_nome ? <Badge variant="secondary">{v.especialidade_nome}</Badge> : "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Editar"
-                          onClick={() => {
-                            setEditing(v);
-                            setDialogOpen(true);
-                          }}
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => { setEditing(v); setDialogOpen(true); }}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          title="Excluir"
-                          onClick={() => handleDelete(v.id, v.aluno_nome ?? "este aluno")}
-                        >
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDelete(v.id, v.aluno_nome)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -308,111 +200,108 @@ function VinculosPage() {
         </CardContent>
       </Card>
 
-      {/* ── Dialog de criação/edição ── */}
-      <VinculoDialog
+      <AlocacaoDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         data={editing}
         alunos={alunos}
         preceptores={preceptores}
-        rotacoes={rotacoes}
-        onSaved={() => {
-          setDialogOpen(false);
-          setEditing(null);
-          fetchVinculos();
-        }}
+        unidades={unidades}
+        especialidades={especialidades}
+        onSaved={fetchAlocacoes}
       />
     </div>
   );
 }
 
-// ─── Dialog de criação / edição ───────────────────────────────────────────────
-
-function VinculoDialog({
-  open,
-  onOpenChange,
-  data,
-  alunos,
-  preceptores,
-  rotacoes,
-  onSaved,
+function AlocacaoDialog({
+  open, onOpenChange, data, alunos, preceptores, unidades, especialidades, onSaved,
 }: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  data: VinculoRow | null;
-  alunos: AlunoRef[];
-  preceptores: PreceptorRef[];
-  rotacoes: RotacaoRef[];
-  onSaved: () => void;
+  open: boolean; onOpenChange: (o: boolean) => void; data: AlocacaoRow | null;
+  alunos: any[]; preceptores: any[]; unidades: any[]; especialidades: any[]; onSaved: () => void;
 }) {
   const isEdit = !!data;
   const [saving, setSaving] = useState(false);
-  const [mes, setMes] = useState("");
-  const [horas, setHoras] = useState("");
   const [alunoId, setAlunoId] = useState("");
   const [preceptorId, setPreceptorId] = useState("");
-  const [rotacaoId, setRotacaoId] = useState("");
+  const [unidadeId, setUnidadeId] = useState("");
+  const [especialidadeId, setEspecialidadeId] = useState("none");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
 
-  // Preenche o form ao abrir para edição
   useEffect(() => {
     if (open) {
-      setMes(data?.mes_referencia ?? "");
-      setHoras(String(data?.horas_realizadas ?? ""));
       setAlunoId(data?.aluno_id ?? "");
       setPreceptorId(data?.preceptor_id ?? "");
-      setRotacaoId(data?.rotacao_id ?? "");
+      setUnidadeId(data?.unidade_id ?? "");
+      setEspecialidadeId(data?.especialidade_id ?? "none");
+      setDataInicio(data?.data_inicio ?? new Date().toISOString().split("T")[0]);
+      setDataFim(data?.data_fim ?? "");
     }
   }, [open, data]);
 
   async function handleSave() {
-    if (!mes || !alunoId || !preceptorId || !rotacaoId || !horas) {
+    if (!alunoId || !preceptorId || !unidadeId || !dataInicio) {
       toast.warning("Preencha todos os campos obrigatórios.");
       return;
     }
 
-    const horasNum = Number(horas);
-    const preceptor = preceptores.find((p) => p.id === preceptorId);
-    const valorHora = preceptor?.valor_hora ?? 0;
-    const custoTotal = horasNum * valorHora;
-
     setSaving(true);
     try {
+      // ── VERIFICAÇÃO DE SOBREPOSIÇÃO (REGRA DE NEGÓCIO 4) ──
+      // Aluno não pode ter outro preceptor no mesmo período
+      let query = supabase.from("alocacoes" as any).select("id").eq("aluno_id", alunoId);
+      
       if (isEdit && data) {
-        // ── UPDATE ──────────────────────────────────────────────────────────
-        const { error: err } = await supabase
-          .from("vinculo_operacional")
-          .update({
-            mes_referencia: mes,
-            horas_realizadas: horasNum,
-            aluno_id: alunoId,
-            preceptor_id: preceptorId,
-            rotacao_id: rotacaoId,
-            valor_hora_preceptor: valorHora,
-            custo_total_rotacao: custoTotal,
-          })
-          .eq("id", data.id);
-
-        if (err) throw err;
-        toast.success("Vínculo atualizado com sucesso!");
-      } else {
-        // ── INSERT ──────────────────────────────────────────────────────────
-        const { error: err } = await supabase.from("vinculo_operacional").insert({
-          mes_referencia: mes,
-          horas_realizadas: horasNum,
-          aluno_id: alunoId,
-          preceptor_id: preceptorId,
-          rotacao_id: rotacaoId,
-          valor_hora_preceptor: valorHora,
-          custo_total_rotacao: custoTotal,
-        });
-
-        if (err) throw err;
-        toast.success("Vínculo criado com sucesso!");
+        query = query.neq("id", data.id);
       }
 
+      const { data: overlaps, error: checkErr } = await query;
+      if (checkErr) throw checkErr;
+
+      const dIni = new Date(dataInicio).getTime();
+      const dFim = dataFim ? new Date(dataFim).getTime() : Infinity;
+
+      // Manual overlap check against existing rows since PostgREST OR syntax can be tricky with dates
+      if (overlaps && overlaps.length > 0) {
+        const { data: fullOverlaps } = await supabase.from("alocacoes" as any).select("id, data_inicio, data_fim").in("id", overlaps.map((o: any) => o.id));
+        
+        for (const o of (fullOverlaps || [])) {
+           const oIni = new Date(o.data_inicio).getTime();
+           const oFim = o.data_fim ? new Date(o.data_fim).getTime() : Infinity;
+           
+           // Se inicio1 <= fim2 E fim1 >= inicio2 -> CHOQUE!
+           if (dIni <= oFim && dFim >= oIni) {
+             toast.error("Aluno já possui preceptor alocado neste período.", { duration: 5000 });
+             setSaving(false);
+             return;
+           }
+        }
+      }
+
+      const payload = {
+        aluno_id: alunoId,
+        preceptor_id: preceptorId,
+        unidade_id: unidadeId,
+        especialidade_id: especialidadeId === "none" ? null : especialidadeId,
+        data_inicio: dataInicio,
+        data_fim: dataFim || null,
+      };
+
+      if (isEdit && data) {
+        const { error: err } = await supabase.from("alocacoes" as any).update(payload).eq("id", data.id);
+        if (err) throw err;
+        toast.success("Alocação atualizada!");
+      } else {
+        const { error: err } = await supabase.from("alocacoes" as any).insert(payload);
+        if (err) throw err;
+        toast.success("Alocação criada!");
+      }
+
+      onOpenChange(false);
       onSaved();
     } catch (e: any) {
-      toast.error("Erro ao salvar: " + (e?.message ?? "Tente novamente."));
+      toast.error("Erro: " + e.message);
     } finally {
       setSaving(false);
     }
@@ -422,100 +311,60 @@ function VinculoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar Vínculo" : "Novo Vínculo"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Editar Alocação" : "Nova Alocação"}</DialogTitle>
         </DialogHeader>
-
-        <div className="grid gap-4 py-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="v-mes">Mês de referência *</Label>
-              <Input id="v-mes" type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="v-horas">Horas realizadas *</Label>
-              <Input
-                id="v-horas"
-                type="number"
-                min={1}
-                placeholder="60"
-                value={horas}
-                onChange={(e) => setHoras(e.target.value)}
-              />
-            </div>
-          </div>
-
+        <div className="grid gap-4 py-2 max-h-[70vh] overflow-y-auto">
           <div className="grid gap-2">
             <Label>Aluno *</Label>
             <Select value={alunoId} onValueChange={setAlunoId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o aluno" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecione o aluno" /></SelectTrigger>
               <SelectContent>
-                {alunos.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.nome}
-                    {a.semestre ? ` — ${a.semestre}º sem.` : ""}
-                  </SelectItem>
-                ))}
+                {alunos.map((a) => <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-
           <div className="grid gap-2">
             <Label>Preceptor *</Label>
             <Select value={preceptorId} onValueChange={setPreceptorId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o preceptor" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecione o preceptor" /></SelectTrigger>
               <SelectContent>
-                {preceptores.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nome}
-                    {p.especialidade ? ` — ${p.especialidade}` : ""}
-                  </SelectItem>
-                ))}
+                {preceptores.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-
           <div className="grid gap-2">
-            <Label>Rotação *</Label>
-            <Select value={rotacaoId} onValueChange={setRotacaoId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a rotação" />
-              </SelectTrigger>
+            <Label>Unidade *</Label>
+            <Select value={unidadeId} onValueChange={setUnidadeId}>
+              <SelectTrigger><SelectValue placeholder="Selecione a unidade" /></SelectTrigger>
               <SelectContent>
-                {rotacoes.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.nome}
-                  </SelectItem>
-                ))}
+                {unidades.map((u) => <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-
-          {/* Preview do custo calculado */}
-          {horas && preceptorId && (
-            <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-              💰 Custo estimado:{" "}
-              <span className="font-semibold text-foreground">
-                {formatBRL(
-                  Number(horas) * (preceptores.find((p) => p.id === preceptorId)?.valor_hora ?? 0),
-                )}
-              </span>{" "}
-              ({horas}h ×{" "}
-              {formatBRL(preceptores.find((p) => p.id === preceptorId)?.valor_hora ?? 0)}/h)
+          <div className="grid gap-2">
+            <Label>Especialidade</Label>
+            <Select value={especialidadeId} onValueChange={setEspecialidadeId}>
+              <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhuma</SelectItem>
+                {especialidades.map((e) => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-2">
+              <Label>Data de Início *</Label>
+              <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
             </div>
-          )}
+            <div className="grid gap-2">
+              <Label>Data de Fim</Label>
+              <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+            </div>
+          </div>
         </div>
-
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Salvando…" : isEdit ? "Salvar alterações" : "Criar vínculo"}
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando..." : isEdit ? "Salvar" : "Criar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
