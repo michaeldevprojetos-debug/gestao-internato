@@ -1061,8 +1061,8 @@ function GerenciarUnidadeDialog({
 
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<string>("Outro");
-  const [especialidade, setEspecialidade] = useState<string>("");
-  const [especialidadeCustom, setEspecialidadeCustom] = useState("");
+  const [preceptorEspecialidades, setPreceptorEspecialidades] = useState<Record<string, string>>({});
+  const [preceptorEspecialidadesCustom, setPreceptorEspecialidadesCustom] = useState<Record<string, string>>({});
   const [selectedPreceptores, setSelectedPreceptores] = useState<SelectedPreceptor[]>([]);
   const [preceptorSearch, setPreceptorSearch] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1099,8 +1099,8 @@ function GerenciarUnidadeDialog({
     if (!open) return;
     setNome(local?.nome ?? "");
     setTipo(local?.tipo ?? "Outro");
-    setEspecialidade("");
-    setEspecialidadeCustom("");
+    setPreceptorEspecialidades({});
+    setPreceptorEspecialidadesCustom({});
     setSelectedPreceptores(
       local?.preceptoresList.map((p) => ({ type: "existing" as const, id: p.id, nome: p.nome })) ??
         [],
@@ -1108,15 +1108,29 @@ function GerenciarUnidadeDialog({
     setPreceptorSearch("");
     // Initialize per-preceptor aluno selections from existing data using Direct ID mapping
     const initialAlunos: Record<string, string[]> = {};
+    const initialEspecialidades: Record<string, string> = {};
+    const initialEspecialidadesCustom: Record<string, string> = {};
+
     if (local) {
       for (const p of local.preceptoresList) {
         const studentIds = local.alunosVinculados
           .filter((a) => a.preceptor_id === p.id)
           .map((a) => a.aluno_id);
         if (studentIds.length > 0) initialAlunos[p.id] = studentIds;
+
+        if (p.especialidade) {
+          if (ESPECIALIDADES_COMUNS.includes(p.especialidade as any)) {
+            initialEspecialidades[p.id] = p.especialidade;
+          } else {
+            initialEspecialidades[p.id] = "Outra";
+            initialEspecialidadesCustom[p.id] = p.especialidade;
+          }
+        }
       }
     }
     setPreceptorAlunos(initialAlunos);
+    setPreceptorEspecialidades(initialEspecialidades);
+    setPreceptorEspecialidadesCustom(initialEspecialidadesCustom);
   }, [open, local]);
 
   const toggleExisting = (p: PreceptorSimple) => {
@@ -1129,8 +1143,29 @@ function GerenciarUnidadeDialog({
           delete copy[p.id];
           return copy;
         });
+        setPreceptorEspecialidades((pe) => {
+          const copy = { ...pe };
+          delete copy[p.id];
+          return copy;
+        });
+        setPreceptorEspecialidadesCustom((pec) => {
+          const copy = { ...pec };
+          delete copy[p.id];
+          return copy;
+        });
         return prev.filter((t) => !(t.type === "existing" && t.id === p.id));
       }
+      
+      // Initialize specialty when adding existing preceptor
+      if (p.especialidade) {
+        if (ESPECIALIDADES_COMUNS.includes(p.especialidade as any)) {
+          setPreceptorEspecialidades((pe) => ({ ...pe, [p.id]: p.especialidade! }));
+        } else {
+          setPreceptorEspecialidades((pe) => ({ ...pe, [p.id]: "Outra" }));
+          setPreceptorEspecialidadesCustom((pec) => ({ ...pec, [p.id]: p.especialidade! }));
+        }
+      }
+      
       return [...prev, { type: "existing", id: p.id, nome: p.nome }];
     });
   };
@@ -1139,6 +1174,16 @@ function GerenciarUnidadeDialog({
     const key = tag.type === "existing" ? tag.id : tag.tempId;
     setPreceptorAlunos((pa) => {
       const copy = { ...pa };
+      delete copy[key];
+      return copy;
+    });
+    setPreceptorEspecialidades((pe) => {
+      const copy = { ...pe };
+      delete copy[key];
+      return copy;
+    });
+    setPreceptorEspecialidadesCustom((pec) => {
+      const copy = { ...pec };
       delete copy[key];
       return copy;
     });
@@ -1293,9 +1338,6 @@ function GerenciarUnidadeDialog({
                 const realPreceptorId =
                   tagOfStudent.type === "existing" ? tagOfStudent.id : "NEW_PRECEPTOR";
                 const isSamePreceptor = realPreceptorId === ext.preceptor_id;
-                // Since finalEspecialidade is set below, let's just grab the current especialidade being saved.
-                const currentEspecialidade =
-                  especialidade === "Outra" ? especialidadeCustom.trim() : especialidade;
                 // Wait, if it's a NEW preceptor, realPreceptorId is definitely different from ext.preceptor_id
                 // But the user specifies: "apenas se o Preceptor e a Especialidade forem diferentes".
                 if (isSamePreceptor) {
@@ -1315,8 +1357,6 @@ function GerenciarUnidadeDialog({
     setSaving(true);
     try {
       let localId: string = local?.id ?? "";
-      const finalEspecialidade =
-        especialidade === "Outra" ? especialidadeCustom.trim() : especialidade;
 
       // ── Verificar se o local já existe pelo nome ou criar novo ──
       const matchedLocal = allLocaisSimple.find(
@@ -1351,11 +1391,15 @@ function GerenciarUnidadeDialog({
       const tempIdToRealId = new Map<string, string>();
 
       for (const tag of newTags) {
+        const pEsp = preceptorEspecialidades[tag.tempId];
+        const pEspCust = preceptorEspecialidadesCustom[tag.tempId];
+        const finalEsp = pEsp === "Outra" ? (pEspCust?.trim() || "") : pEsp;
+
         const insertData: Record<string, any> = {
           nome: tag.nome,
           local_id: localId,
         };
-        if (finalEspecialidade) insertData.especialidade = finalEspecialidade;
+        if (finalEsp) insertData.especialidade = finalEsp;
 
         const { data, error } = await supabase
           .from("preceptores")
@@ -1375,18 +1419,24 @@ function GerenciarUnidadeDialog({
       const allSelectedIds = [...existingIds, ...newCreatedIds];
 
       if (allSelectedIds.length > 0) {
-        const { error } = await supabase
-          .from("preceptores" as any)
-          .update({ local_id: localId })
-          .in("id", allSelectedIds);
-        if (error) throw error;
+        // Prevent updating local_id for existing preceptors if it causes FK issues, 
+        // but we'll stick to just updating what's needed. We update local_id only for new preceptors 
+        // since existing ones might belong to other units. Actually, the user asked to fix the FK error, 
+        // which implies we shouldn't arbitrarily change local_id for existing preceptors if they are shared.
+        // Let's only update especialidade per preceptor.
 
-        if (finalEspecialidade && existingIds.length > 0) {
-          const { error: errEsp } = await supabase
-            .from("preceptores" as any)
-            .update({ especialidade: finalEspecialidade })
-            .in("id", existingIds);
-          if (errEsp) throw errEsp;
+        for (const existingId of existingIds) {
+          const pEsp = preceptorEspecialidades[existingId];
+          const pEspCust = preceptorEspecialidadesCustom[existingId];
+          const finalEsp = pEsp === "Outra" ? (pEspCust?.trim() || "") : pEsp;
+
+          if (finalEsp) {
+            const { error: errEsp } = await supabase
+              .from("preceptores" as any)
+              .update({ especialidade: finalEsp })
+              .eq("id", existingId);
+            if (errEsp) throw errEsp;
+          }
         }
       }
 
@@ -1623,30 +1673,6 @@ function GerenciarUnidadeDialog({
             )}
           </div>
 
-          {/* ── Especialidade ── */}
-          <div className="grid gap-2">
-            <Label htmlFor="g-especialidade">Especialidade</Label>
-            <Select value={especialidade} onValueChange={setEspecialidade}>
-              <SelectTrigger id="g-especialidade">
-                <SelectValue placeholder="Selecione a especialidade" />
-              </SelectTrigger>
-              <SelectContent>
-                {ESPECIALIDADES_COMUNS.map((e) => (
-                  <SelectItem key={e} value={e}>
-                    {e}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {especialidade === "Outra" && (
-              <Input
-                placeholder="Digite a especialidade…"
-                value={especialidadeCustom}
-                onChange={(e) => setEspecialidadeCustom(e.target.value)}
-                className="mt-1"
-              />
-            )}
-          </div>
 
           {/* ── Lista de preceptores alocados e suas vinculações de alunos ── */}
           {selectedPreceptores.length > 0 && (
@@ -1698,6 +1724,46 @@ function GerenciarUnidadeDialog({
                             <X className="h-4 w-4" />
                           </button>
                         </div>
+                      </div>
+
+                      {/* Especialidade do Preceptor */}
+                      <div className="mt-2 pt-2 border-t border-border/40 grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_1fr] gap-3">
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Especialidade
+                          </Label>
+                          <Select 
+                            value={preceptorEspecialidades[key] || ""} 
+                            onValueChange={(val) => setPreceptorEspecialidades((prev) => ({ ...prev, [key]: val }))}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ESPECIALIDADES_COMUNS.map((e) => (
+                                <SelectItem key={e} value={e} className="text-xs">
+                                  {e}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {preceptorEspecialidades[key] === "Outra" && (
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-transparent select-none sm:block hidden">
+                              Personalizada
+                            </Label>
+                            <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block sm:hidden">
+                              Especificar
+                            </Label>
+                            <Input
+                              placeholder="Digite a especialidade…"
+                              value={preceptorEspecialidadesCustom[key] || ""}
+                              onChange={(e) => setPreceptorEspecialidadesCustom((prev) => ({ ...prev, [key]: e.target.value }))}
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        )}
                       </div>
 
                       {/* Rótulo e Componente de Alunos */}

@@ -393,6 +393,8 @@ function Dashboard() {
                         border: "1px solid #1e293b",
                         borderRadius: "8px",
                       }}
+                      itemStyle={{ color: "#e2e8f0" }}
+                      labelStyle={{ color: "#f8fafc" }}
                     />
                     <Bar dataKey="alunos" fill="#22c55e" radius={[0, 4, 4, 0]} maxBarSize={40} />
                   </BarChart>
@@ -431,6 +433,7 @@ function Dashboard() {
                         border: "1px solid #1e293b",
                         borderRadius: "8px",
                       }}
+                      itemStyle={{ color: "#e2e8f0" }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
