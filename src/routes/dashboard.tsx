@@ -360,10 +360,24 @@ function Dashboard() {
     const especialidades = [...new Set(rows.map((r: any) => r.text_especialidade || r.especialidade).filter(Boolean))];
     const alunos = [...new Set(rows.map((r: any) => r.aluno).filter(Boolean))];
     const turnos = [...new Set(rows.map((r: any) => getTurnoLabel(r.hora_inicio, r.hora_fim)))];
-    const chContratada = rows.reduce((acc: number, r: any) => {
+    // Filtrar alocações únicas antes de somar as horas para remover duplicidade de alunos
+    const uniqueAlocs = new Map();
+    rows.forEach((r: any) => {
+      const id = r.alocacao_id || Math.random();
+      if (!uniqueAlocs.has(id)) uniqueAlocs.set(id, r);
+    });
+    const uniqueRows = Array.from(uniqueAlocs.values());
+
+    const chContratada = uniqueRows.reduce((acc: number, r: any) => {
       let calc_ch = Number(r.ch_prevista || r.carga_horaria || 0);
+      return acc + calc_ch;
+    }, 0);
+
+    const chRealizada = uniqueRows.reduce((acc: number, r: any) => {
+      let calc_hr = Number(r.horas_realizadas || 0);
       
-      if (calc_ch === 0 && r.data_inicio && r.data_fim && r.hora_inicio && r.hora_fim) {
+      // Fallback: se H. Realizadas for 0, calcular pelas datas
+      if (calc_hr === 0 && r.data_inicio && r.data_fim && r.hora_inicio && r.hora_fim) {
         try {
           const start = new Date(r.data_inicio);
           const end = new Date(r.data_fim);
@@ -373,15 +387,11 @@ function Dashboard() {
             const [h2, m2] = r.hora_fim.split(":").map(Number);
             let diffHours = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
             if (diffHours < 0) diffHours += 24;
-            calc_ch = diffDays * diffHours;
+            calc_hr = diffDays * diffHours;
           }
         } catch (e) {}
       }
-      return acc + (calc_ch / Number(r.qtd_alunos_alocacao || 1));
-    }, 0);
-
-    const chRealizada = rows.reduce((acc: number, r: any) => {
-      return acc + (Number(r.horas_realizadas || 0) / Number(r.qtd_alunos_alocacao || 1));
+      return acc + calc_hr;
     }, 0);
 
     const aproveitamento = chContratada > 0 ? Math.round((chRealizada / chContratada) * 100) : 0;

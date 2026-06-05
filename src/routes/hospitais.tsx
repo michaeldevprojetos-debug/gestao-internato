@@ -1157,7 +1157,7 @@ function GerenciarUnidadeDialog({
   const [horaFim, setHoraFim] = useState("12:00");
 
 
-    // Cálculo automático de CH Prevista
+    // Cálculo automático de Horas Realizadas
     useEffect(() => {
       if (!dataInicio || !dataFim || !horaInicio || !horaFim) return;
       try {
@@ -1177,7 +1177,7 @@ function GerenciarUnidadeDialog({
         const chCalculada = Math.round(diffDays * diffHours);
         
         if (chCalculada > 0) {
-          setPreceptorChPrevista(prev => {
+          setPreceptorHorasRealizadas(prev => {
             const newCh = { ...prev };
             selectedPreceptores.forEach(tag => {
               const key = tag.type === "existing" ? tag.id : tag.tempId;
@@ -1962,11 +1962,11 @@ function GerenciarUnidadeDialog({
                         </div>
                         <div className="grid gap-1.5">
                           <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">CH Prevista</Label>
-                          <Input type="number" min={0} className="h-8 text-xs bg-muted/50 cursor-not-allowed" readOnly value={preceptorChPrevista[key] || ""} title="Calculado automaticamente a partir das datas e horas" />
+                          <Input type="number" min={0} className="h-8 text-xs" value={preceptorChPrevista[key] || ""} onChange={(e) => setPreceptorChPrevista(p => ({...p, [key]: e.target.value ? Number(e.target.value) : ""}))} />
                         </div>
                         <div className="grid gap-1.5">
                           <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">H. Realizadas</Label>
-                          <Input type="number" min={0} className="h-8 text-xs" value={preceptorHorasRealizadas[key] || ""} onChange={(e) => setPreceptorHorasRealizadas(p => ({...p, [key]: e.target.value ? Number(e.target.value) : ""}))} />
+                          <Input type="number" min={0} className="h-8 text-xs bg-muted/50 cursor-not-allowed" readOnly value={preceptorHorasRealizadas[key] || ""} title="Calculado automaticamente a partir das datas e horas" />
                         </div>
                       </div>
 
