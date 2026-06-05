@@ -136,7 +136,7 @@ function Dashboard() {
         selectedEspecialidade === "all" ||
         (a.especialidade_id && a.especialidade_id === selectedEspecialidade) ||
         (!a.especialidade_id && selectedEspecialidade === "null") ||
-        (a.especialidade && a.especialidade === especialidadesFiltro.find(e => e.id === selectedEspecialidade)?.nome);
+        (a.text_especialidade && a.text_especialidade === especialidadesFiltro.find(e => e.id === selectedEspecialidade)?.nome);
       const passPreceptor = selectedPreceptor === "all" || a.preceptor_id === selectedPreceptor;
       return passUnidade && passEspecialidade && passPreceptor;
     });
@@ -156,7 +156,7 @@ function Dashboard() {
     const preceptoresSet = new Set<string>();
     const unidadesSet = new Set<string>();
 
-    const preceptorMap = new Map<string, { nome: string; count: Set<string>; turnos: Set<string> }>();
+    const preceptorMap = new Map<string, { nome: string; count: Set<string>; turnos: Set<string>; especialidades: Set<string> }>();
     const especialidadeMap = new Map<string, Set<string>>();
     const unidadeMap = new Map<string, { nome: string; count: Set<string> }>();
 
@@ -171,9 +171,11 @@ function Dashboard() {
             nome: a.preceptor || "Desconhecido",
             count: new Set(),
             turnos: new Set(),
+            especialidades: new Set(),
           });
         }
         if (a.aluno) preceptorMap.get(a.preceptor_id)!.count.add(a.aluno);
+        if (a.text_especialidade) preceptorMap.get(a.preceptor_id)!.especialidades.add(a.text_especialidade);
         
         // Add turno string
         if (a.hora_inicio && a.hora_fim) {
@@ -188,7 +190,7 @@ function Dashboard() {
         }
       }
 
-      const espNome = a.especialidade || "Sem Especialidade";
+      const espNome = a.text_especialidade || "Sem Especialidade";
       if (!especialidadeMap.has(espNome)) especialidadeMap.set(espNome, new Set());
       if (a.aluno) especialidadeMap.get(espNome)!.add(a.aluno);
 
@@ -204,7 +206,8 @@ function Dashboard() {
       .map((p) => ({ 
         preceptor: p.nome, 
         alunos: p.count.size,
-        turnos: Array.from(p.turnos)
+        turnos: Array.from(p.turnos),
+        text_especialidade: Array.from(p.especialidades).join(', ') || "Sem Especialidade"
       }))
       .sort((a, b) => b.alunos - a.alunos)
       .slice(0, 10);
@@ -418,6 +421,14 @@ function Dashboard() {
                                   {data.alunos}
                                 </span>
                               </div>
+                              {data.text_especialidade && (
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Especialidade</span>
+                                  <span className="text-slate-700 dark:text-slate-300 font-medium text-[11px] text-right truncate max-w-[140px]" title={data.text_especialidade}>
+                                    {data.text_especialidade}
+                                  </span>
+                                </div>
+                              )}
                               {data.turnos && data.turnos.length > 0 && (
                                 <div className="mt-2 space-y-1">
                                   <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Escala / Turnos</span>
