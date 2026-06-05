@@ -1568,6 +1568,11 @@ function GerenciarUnidadeDialog({
         data_fim: string | null;
         hora_inicio: string | null;
         hora_fim: string | null;
+        mes_referencia?: string | null;
+        semestre?: string | null;
+        rotacao_periodo_id?: string | null;
+        ch_prevista?: number | null;
+        horas_realizadas?: number | null;
       }> = [];
 
       for (const tag of selectedPreceptores) {
@@ -1602,6 +1607,11 @@ function GerenciarUnidadeDialog({
             data_fim: dataFim || null,
             hora_inicio: horaInicio || null,
             hora_fim: horaFim || null,
+            mes_referencia: preceptorMes[key] || null,
+            semestre: preceptorSemestre[key] || null,
+            rotacao_periodo_id: preceptorRotacao[key] || null,
+            ch_prevista: preceptorChPrevista[key] || null,
+            horas_realizadas: preceptorHorasRealizadas[key] || null,
           });
         }
       }
