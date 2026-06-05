@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -54,21 +55,19 @@ type Especialidade = {
 };
 
 function PreceptoresPage() {
-  const [preceptores, setPreceptores] = useState<PreceptorRow[]>([]);
+  const queryClient = useQueryClient();
+
   const [filtered, setFiltered] = useState<PreceptorRow[]>([]);
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPreceptor, setEditingPreceptor] = useState<PreceptorRow | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const { data: preceptoresData, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["preceptores"],
+    queryFn: async () => {
       const [precRes, espRes] = await Promise.all([
         supabase
           .from("preceptores" as any)
@@ -94,19 +93,17 @@ function PreceptoresPage() {
         tipo_remuneracao: p.tipo_remuneracao || "Bolsa",
         valor_hora: p.valor_hora || 80.00,
       }));
-
-      setPreceptores(rows);
-      setFiltered(rows);
-    } catch (e: any) {
-      setError(e.message ?? "Erro ao carregar dados.");
-    } finally {
-      setLoading(false);
+      return rows;
     }
-  }, []);
+  });
 
+  const preceptores = preceptoresData || [];
+  const error = queryError ? (queryError as Error).message : null;
+
+  // Force refetch on mount as requested
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    queryClient.invalidateQueries({ queryKey: ["preceptores"] });
+  }, [queryClient]);
 
   useEffect(() => {
     const term = query.toLowerCase();
@@ -138,7 +135,7 @@ function PreceptoresPage() {
         .eq("id", id);
       if (error) throw error;
       toast.success("Preceptor inativado com sucesso.");
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ["preceptores"] });
     } catch (e: any) {
       toast.error("Erro ao inativar: " + e.message);
     }
