@@ -197,39 +197,29 @@ function PreceptoresPage() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell>
-                      <Skeleton className="h-5 w-48" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-32" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-16 mx-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-8 w-16 ml-auto" />
-                    </TableCell>
+                    <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16 mx-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
-                    Nenhum preceptor encontrado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((p) => (
-                  <TableRow key={p.id} className={!p.ativo ? "opacity-60" : ""}>
-                    <TableCell className="font-semibold">{p.nome}</TableCell>
+              ) : filtered && filtered.length > 0 ? (
+                filtered.map((p) => {
+                  if (!p) return null;
+                  const isAtivo = p?.ativo ?? true;
+                  const tipoRemuneracao = p?.tipo_remuneracao || "Bolsa";
+                  return (
+                  <TableRow key={p?.id || Math.random().toString()} className={!isAtivo ? "opacity-60" : ""}>
+                    <TableCell className="font-semibold">{p?.nome || "Sem Nome"}</TableCell>
                     <TableCell>
-                      {p.especialidade_nome ? (
+                      {p?.especialidade_nome ? (
                         <Badge variant="secondary">{p.especialidade_nome}</Badge>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">Não informada</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      {p.ativo ? (
+                      {isAtivo ? (
                         <Badge
                           variant="outline"
                           className="text-green-600 border-green-200 bg-green-50"
@@ -257,12 +247,12 @@ function PreceptoresPage() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        {p.ativo && (
+                        {isAtivo && p?.id && (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(p.id, p.nome)}
+                            onClick={() => handleDelete(p.id, p.nome || "Preceptor")}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -270,7 +260,13 @@ function PreceptoresPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                )})
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                    <p>Nenhum preceptor encontrado.</p>
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
@@ -282,7 +278,7 @@ function PreceptoresPage() {
         onOpenChange={setDialogOpen}
         preceptor={editingPreceptor}
         especialidades={especialidades}
-        onSaved={fetchData}
+        onSaved={() => queryClient.invalidateQueries({ queryKey: ['preceptores'] })}
       />
     </div>
   );
