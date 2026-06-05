@@ -123,21 +123,39 @@ function Dashboard() {
   });
 
   const alocacoes = dashboardData?.alocacoes || [];
-  const unidadesFiltro = dashboardData?.unidades || [];
-  const especialidadesFiltro = dashboardData?.especialidades || [];
-  const preceptoresFiltro = dashboardData?.preceptores || [];
-  const horasConcluidas = 0; // Se necessário, re-implementar a lógica de agenda separadamente, ou remover do dashboard.
+  const horasConcluidas = 0; // Se necessário, re-implementar a lógica de agenda separadamente
   const lastUpdate = new Date(); // Para simplificar a UI
+
+  // Build dynamic filters from ACTUAL allocations to ensure 100% accuracy
+  const dynamicUnidadesFiltro = useMemo(() => {
+    const unis = new Map<string, string>();
+    alocacoes.forEach(a => { if (a.unidade_id && a.unidade) unis.set(a.unidade_id, a.unidade); });
+    return Array.from(unis.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [alocacoes]);
+
+  const dynamicEspecialidadesFiltro = useMemo(() => {
+    const specs = new Set<string>();
+    alocacoes.forEach(a => { 
+      // Robust mapping: Prioritize text_especialidade from the view
+      specs.add(a.text_especialidade || a.especialidade || "Sem Especialidade"); 
+    });
+    return Array.from(specs).sort().map((nome) => ({ id: nome, nome }));
+  }, [alocacoes]);
+
+  const dynamicPreceptoresFiltro = useMemo(() => {
+    const precs = new Map<string, string>();
+    alocacoes.forEach(a => { if (a.preceptor_id && a.preceptor) precs.set(a.preceptor_id, a.preceptor); });
+    return Array.from(precs.entries()).map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [alocacoes]);
 
   const filteredAloc = useMemo(() => {
     return alocacoes.filter((a) => {
       const passUnidade = selectedUnidade === "all" || a.unidade_id === selectedUnidade;
-      const passEspecialidade =
-        selectedEspecialidade === "all" ||
-        (a.especialidade_id && a.especialidade_id === selectedEspecialidade) ||
-        (!a.especialidade_id && selectedEspecialidade === "null") ||
-        (a.text_especialidade && a.text_especialidade === especialidadesFiltro.find(e => e.id === selectedEspecialidade)?.nome);
       const passPreceptor = selectedPreceptor === "all" || a.preceptor_id === selectedPreceptor;
+      
+      const aEspecialidade = a.text_especialidade || a.especialidade || "Sem Especialidade";
+      const passEspecialidade = selectedEspecialidade === "all" || aEspecialidade === selectedEspecialidade;
+      
       return passUnidade && passEspecialidade && passPreceptor;
     });
   }, [alocacoes, selectedUnidade, selectedEspecialidade, selectedPreceptor]);
@@ -175,7 +193,8 @@ function Dashboard() {
           });
         }
         if (a.aluno) preceptorMap.get(a.preceptor_id)!.count.add(a.aluno);
-        if (a.text_especialidade) preceptorMap.get(a.preceptor_id)!.especialidades.add(a.text_especialidade);
+        const pEsp = a.text_especialidade || a.especialidade;
+        if (pEsp && pEsp !== "Sem Especialidade") preceptorMap.get(a.preceptor_id)!.especialidades.add(pEsp);
         
         // Add turno string
         if (a.hora_inicio && a.hora_fim) {
@@ -190,7 +209,7 @@ function Dashboard() {
         }
       }
 
-      const espNome = a.text_especialidade || "Sem Especialidade";
+      const espNome = a.text_especialidade || a.especialidade || "Sem Especialidade";
       if (!especialidadeMap.has(espNome)) especialidadeMap.set(espNome, new Set());
       if (a.aluno) especialidadeMap.get(espNome)!.add(a.aluno);
 
@@ -264,7 +283,7 @@ function Dashboard() {
             </SelectTrigger>
             <SelectContent className="max-h-80">
               <SelectItem value="all">Todas as Unidades</SelectItem>
-              {unidadesFiltro.map((u) => (
+              {dynamicUnidadesFiltro.map((u) => (
                 <SelectItem key={u.id} value={u.id}>
                   {u.nome}
                 </SelectItem>
@@ -278,7 +297,7 @@ function Dashboard() {
             </SelectTrigger>
             <SelectContent className="max-h-80">
               <SelectItem value="all">Todas as Especialidades</SelectItem>
-              {especialidadesFiltro.map((e) => (
+              {dynamicEspecialidadesFiltro.map((e) => (
                 <SelectItem key={e.id} value={e.id}>
                   {e.nome}
                 </SelectItem>
@@ -292,7 +311,7 @@ function Dashboard() {
             </SelectTrigger>
             <SelectContent className="max-h-80">
               <SelectItem value="all">Todos os Preceptores</SelectItem>
-              {preceptoresFiltro.map((p) => (
+              {dynamicPreceptoresFiltro.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.nome}
                 </SelectItem>
