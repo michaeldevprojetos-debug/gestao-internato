@@ -134,8 +134,8 @@ function Dashboard() {
       const passUnidade = selectedUnidade === "all" || a.unidade_id === selectedUnidade;
       const passEspecialidade =
         selectedEspecialidade === "all" ||
-        (a.especialidade_nome && a.especialidade_nome === selectedEspecialidade) ||
-        (!a.especialidade_nome && selectedEspecialidade === "null");
+        (a.especialidade_id && a.especialidade_id === selectedEspecialidade) ||
+        (!a.especialidade_id && selectedEspecialidade === "null");
       const passPreceptor = selectedPreceptor === "all" || a.preceptor_id === selectedPreceptor;
       return passUnidade && passEspecialidade && passPreceptor;
     });

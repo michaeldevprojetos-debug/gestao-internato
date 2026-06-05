@@ -1317,34 +1317,10 @@ function GerenciarUnidadeDialog({
           if (datesOverlap && timesOverlap) {
             // Conflito de tempo detectado para o aluno ext.aluno_id
             
-            // Qual unidade atual estamos salvando? 
-            // isNew ? não temos localId ainda, mas a lógica exige comparar
-            const savingLocalId = local?.id; 
-
+            const savingLocalId = local?.id;
             if (ext.unidade_id !== savingLocalId) {
-              toast.error("Conflito: Este aluno já está alocado em outra unidade neste mesmo dia e horário!");
+              toast.error("Conflito: Um ou mais alunos selecionados já possuem alocação em outra unidade neste mesmo dia e horário!");
               return;
-            } else {
-              // Mesma unidade. Verificar preceptor e especialidade
-              // Se for o MESMO preceptor (na mesma unidade) já é um erro ou não?
-              // The user said: "PERMITA o salvamento apenas se o Preceptor e a Especialidade forem diferentes"
-              // Qual preceptor estamos tentando salvar para esse aluno?
-              // Check the tag that contains this student:
-              const tagOfStudent = selectedPreceptores.find(tag => {
-                const key = tag.type === "existing" ? tag.id : tag.tempId;
-                return (preceptorAlunos[key] ?? []).includes(ext.aluno_id);
-              });
-              
-              if (tagOfStudent) {
-                const realPreceptorId = tagOfStudent.type === "existing" ? tagOfStudent.id : "NEW_PRECEPTOR";
-                const isSamePreceptor = realPreceptorId === ext.preceptor_id;
-                // Wait, if it's a NEW preceptor, realPreceptorId is definitely different from ext.preceptor_id
-                // But the user specifies: "apenas se o Preceptor e a Especialidade forem diferentes".
-                if (isSamePreceptor) {
-                  toast.error("Conflito: Este aluno já possui alocação para este preceptor no mesmo horário!");
-                  return;
-                }
-              }
             }
           }
         }

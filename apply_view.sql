@@ -20,7 +20,7 @@ CREATE OR REPLACE VIEW public.vw_dashboard_preceptores AS
 SELECT
     al.id AS alocacao_id,
     p.nome AS preceptor,
-    e.nome AS especialidade,
+    COALESCE(e.nome, esp_pai.nome, 'Sem Especialidade') AS especialidade,
     u.nome AS unidade,
     a.nome AS aluno,
     al.carga_horaria AS carga_horaria,
@@ -30,11 +30,13 @@ SELECT
     al.hora_fim,
     p.id AS preceptor_id,
     u.id AS unidade_id,
-    e.id AS especialidade_id
+    COALESCE(al.especialidade_id, p.especialidade_id) AS especialidade_id
 FROM public.alocacoes al
 INNER JOIN public.alunos a ON a.id = al.aluno_id
 INNER JOIN public.preceptores p ON p.id = al.preceptor_id
-INNER JOIN public.unidades u ON u.id = al.unidade_id;
+INNER JOIN public.unidades u ON u.id = al.unidade_id
+LEFT JOIN public.especialidades e ON e.id = al.especialidade_id
+LEFT JOIN public.especialidades esp_pai ON esp_pai.id = p.especialidade_id;
 
 -- 5. Notifica o cache do Supabase para atualizar o Schema imediatamente
 NOTIFY pgrst, 'reload schema';
