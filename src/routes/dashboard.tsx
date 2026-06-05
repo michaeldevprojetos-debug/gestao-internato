@@ -116,22 +116,9 @@ function Dashboard() {
 
       // 2. Carregar Alocações ativas
       const hoje = new Date().toISOString().split("T")[0];
-      const { data: alocData } = await supabase
-        .from("alocacoes" as any)
-        .select(`
-          id,
-          aluno_id,
-          preceptor_id,
-          unidade_id,
-          especialidade_id,
-          alunos!inner(nome, status),
-          preceptores!inner(nome, ativo),
-          unidades(nome),
-          especialidades(nome)
-        `)
-        .eq("alunos.status", "Ativo")
-        .eq("preceptores.ativo", true)
-        .or(`data_fim.is.null,data_fim.gte.${hoje}`);
+            const { data: alocData } = await supabase
+        .from("vw_dashboard_preceptores" as any)
+        .select("*");
       
       setAlocacoes(alocData || []);
 
@@ -182,55 +169,53 @@ function Dashboard() {
   const filteredAloc = useMemo(() => {
     return alocacoes.filter((a) => {
       const passUnidade = selectedUnidade === "all" || a.unidade_id === selectedUnidade;
-      const passEspecialidade = selectedEspecialidade === "all" || a.especialidade_id === selectedEspecialidade;
+      const passEspecialidade = selectedEspecialidade === "all" || (a.especialidade_nome && a.especialidade_nome === selectedEspecialidade) || (!a.especialidade_nome && selectedEspecialidade === "null");
       const passPreceptor = selectedPreceptor === "all" || a.preceptor_id === selectedPreceptor;
       return passUnidade && passEspecialidade && passPreceptor;
     });
   }, [alocacoes, selectedUnidade, selectedEspecialidade, selectedPreceptor]);
 
   // Calcular KPIs
-  const { totalAlunos, totalPreceptores, totalUnidades, rankingData, especialidadeData, alertasPreceptor, alertasUnidade } = useMemo(() => {
-    const alunosSet = new Set<string>();
+    const { totalAlunos, totalPreceptores, totalUnidades, rankingData, especialidadeData, alertasPreceptor, alertasUnidade } = useMemo(() => {
+    let totalAlunosSum = 0;
     const preceptoresSet = new Set<string>();
     const unidadesSet = new Set<string>();
     
-    const preceptorMap = new Map<string, { nome: string; count: Set<string> }>();
+    const preceptorMap = new Map<string, { nome: string; alunos: number }>();
     const especialidadeMap = new Map<string, number>();
-    const unidadeMap = new Map<string, { nome: string; count: Set<string> }>();
+    const unidadeMap = new Map<string, { nome: string; alunos: number }>();
 
     for (const a of filteredAloc) {
-      if (a.aluno_id) alunosSet.add(a.aluno_id);
       if (a.preceptor_id) preceptoresSet.add(a.preceptor_id);
       if (a.unidade_id) unidadesSet.add(a.unidade_id);
+      
+      const qtdAlunos = Number(a.total_alunos) || 0;
+      totalAlunosSum += qtdAlunos;
 
-      // Ranking do preceptor (contagem de alunos únicos)
       if (a.preceptor_id) {
         if (!preceptorMap.has(a.preceptor_id)) {
-          preceptorMap.set(a.preceptor_id, { nome: a.preceptores?.nome || "Desconhecido", count: new Set() });
+          preceptorMap.set(a.preceptor_id, { nome: a.preceptor_nome || "Desconhecido", alunos: 0 });
         }
-        if (a.aluno_id) preceptorMap.get(a.preceptor_id)!.count.add(a.aluno_id);
+        preceptorMap.get(a.preceptor_id)!.alunos += qtdAlunos;
       }
 
-      // Pizza de Especialidade (contagem de alunos por especialidade)
-      if (a.especialidade_id) {
-        const espNome = a.especialidades?.nome || "Desconhecido";
-        especialidadeMap.set(espNome, (especialidadeMap.get(espNome) || 0) + 1);
+      if (a.especialidade_nome) {
+        const espNome = a.especialidade_nome;
+        especialidadeMap.set(espNome, (especialidadeMap.get(espNome) || 0) + qtdAlunos);
       } else {
-        especialidadeMap.set("Sem Especialidade", (especialidadeMap.get("Sem Especialidade") || 0) + 1);
+        especialidadeMap.set("Sem Especialidade", (especialidadeMap.get("Sem Especialidade") || 0) + qtdAlunos);
       }
 
-      // Alertas de Unidade
       if (a.unidade_id) {
         if (!unidadeMap.has(a.unidade_id)) {
-          unidadeMap.set(a.unidade_id, { nome: a.unidades?.nome || "Desconhecida", count: new Set() });
+          unidadeMap.set(a.unidade_id, { nome: a.unidade_nome || "Desconhecida", alunos: 0 });
         }
-        if (a.aluno_id) unidadeMap.get(a.unidade_id)!.count.add(a.aluno_id);
+        unidadeMap.get(a.unidade_id)!.alunos += qtdAlunos;
       }
     }
 
-    // Preparar arrays
     const rData = Array.from(preceptorMap.values())
-      .map((p) => ({ preceptor: p.nome, alunos: p.count.size }))
+      .map((p) => ({ preceptor: p.nome, alunos: p.alunos }))
       .sort((a, b) => b.alunos - a.alunos)
       .slice(0, 10);
 
@@ -238,12 +223,11 @@ function Dashboard() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
 
-    // Alertas
-    const aPrec = Array.from(preceptorMap.values()).filter(p => p.count.size > limitePreceptor).map(p => ({ nome: p.nome, alunos: p.count.size }));
-    const aUni = Array.from(unidadeMap.values()).filter(u => u.count.size > limiteUnidade).map(u => ({ nome: u.nome, alunos: u.count.size }));
+    const aPrec = Array.from(preceptorMap.values()).filter(p => p.alunos > limitePreceptor).map(p => ({ nome: p.nome, alunos: p.alunos }));
+    const aUni = Array.from(unidadeMap.values()).filter(u => u.alunos > limiteUnidade).map(u => ({ nome: u.nome, alunos: u.alunos }));
 
     return {
-      totalAlunos: alunosSet.size,
+      totalAlunos: totalAlunosSum,
       totalPreceptores: preceptoresSet.size,
       totalUnidades: unidadesSet.size,
       rankingData: rData,
