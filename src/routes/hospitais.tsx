@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { useSystemConfig } from "@/hooks/use-system-config";
@@ -749,6 +750,7 @@ function PreceptorCard({
   limiteAlunos,
   onUpdateQuantidade,
   onEdit,
+  onClear,
 }: {
   preceptor: LocalRow["preceptoresList"][number];
   students: LocalRow["alunosVinculados"];
@@ -756,7 +758,10 @@ function PreceptorCard({
   limiteAlunos: number;
   onUpdateQuantidade: (vinculoId: string | null, preceptorId: string, value: number) => void;
   onEdit?: () => void;
+  onClear?: () => void;
 }) {
+  const { user } = useAuth();
+  const canClear = user?.role === "admin" || user?.role === "super_admin";
   const p = preceptor;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [localQtd, setLocalQtd] = useState(p.quantidadeAlunos);
@@ -794,11 +799,18 @@ function PreceptorCard({
               {p.especialidade}
             </Badge>
           )}
-          {onEdit && (
-            <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={(e) => { e.stopPropagation(); onEdit(); }} title="Editar alocação">
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
-          )}
+          <div className="ml-auto flex items-center gap-1">
+            {onEdit && (
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onEdit(); }} title="Editar alocação">
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            )}
+            {canClear && onClear && (
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50" onClick={(e) => { e.stopPropagation(); onClear(); }} title="Limpar registro deste preceptor no bloco">
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 mb-2">
@@ -1224,10 +1236,7 @@ function GerenciarUnidadeDialog({
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<string>("Outro");
   const [saving, setSaving] = useState(false);
-<<<<<<< HEAD
 
-=======
->>>>>>> 4b6647212542b0d6f820b461d9ca2245ad905bf2
 
   useEffect(() => {
     if (!open) return;
