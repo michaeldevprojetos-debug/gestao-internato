@@ -1219,25 +1219,6 @@ function GerenciarUnidadeDialog({
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<string>("Outro");
   const [saving, setSaving] = useState(false);
-<<<<<<< HEAD
-=======
-  const [preceptoresOptions, setPreceptoresOptions] = useState<PreceptorSimple[]>([]);
-  // Per-preceptor student selections: Map<preceptorKey, string[]>
-  const [preceptorAlunos, setPreceptorAlunos] = useState<Record<string, string[]>>({});
-  
-  const [preceptorMes, setPreceptorMes] = useState<Record<string, string>>({});
-  const [preceptorSemestre, setPreceptorSemestre] = useState<Record<string, string>>({});
-  const [preceptorRotacao, setPreceptorRotacao] = useState<Record<string, string>>({});
-  const [preceptorChPrevista, setPreceptorChPrevista] = useState<Record<string, number | "">>({});
-  const [preceptorHorasRealizadas, setPreceptorHorasRealizadas] = useState<Record<string, number | "">>({});
-  const [rotacoesOptions, setRotacoesOptions] = useState<{id: string, nome: string}[]>([]);
-  
-  useEffect(() => {
-      supabase.from("rotacoes" as any).select("id, nome").order("nome").then(({data}) => {
-        if (data) setRotacoesOptions(data as unknown as {id: string, nome: string}[]);
-      });
-    }, []);
->>>>>>> 93743dfb526f6aa418cdcbb93b2f535b6ce7e823
 
   useEffect(() => {
     if (!open) return;
