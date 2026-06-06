@@ -532,7 +532,7 @@ function Dashboard() {
       </Sheet>
 
       {/* ── HEADER & FILTROS ── */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 bg-slate-100 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg backdrop-blur-sm relative overflow-hidden">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-sm relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent pointer-events-none" />
 
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -601,7 +601,7 @@ function Dashboard() {
       </div>
 
       {/* Sync status */}
-      <div className="flex items-center justify-end gap-2 text-xs text-slate-400 -mt-2 pr-2">
+      <div className="flex items-center justify-end gap-2 text-xs text-slate-500 dark:text-slate-400 -mt-2 pr-2">
         {loading ? (
           <span className="flex items-center gap-1.5">
             <RefreshCw className="h-3 w-3 animate-spin" /> Atualizando...
@@ -611,7 +611,7 @@ function Dashboard() {
             <CheckCircle2 className="h-3 w-3" /> Dados Sincronizados
           </span>
         )}
-        <span className="opacity-50">Última atualização: {lastUpdate.toLocaleTimeString()}</span>
+        <span className="text-slate-400 dark:text-slate-500">Última atualização: {lastUpdate.toLocaleTimeString()}</span>
       </div>
 
       {/* ── KPIs ── */}
@@ -625,11 +625,11 @@ function Dashboard() {
 
       {/* ── ALERTAS ── */}
       <div className="grid grid-cols-1 gap-4">
-        <Card className="border-red-900/50 bg-red-950/10 dark:bg-red-950/20 w-full">
+        <Card className="border-red-300 dark:border-red-900/50 bg-red-100 dark:bg-red-950/20 w-full shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-bold flex items-center gap-2 text-red-500">
               <AlertTriangle className="h-4 w-4" /> Alerta: Preceptores
-              <span className="ml-auto text-[10px] uppercase bg-red-900/40 px-2 py-0.5 rounded text-red-400">
+              <span className="ml-auto text-[10px] uppercase bg-red-200 dark:bg-red-900/40 px-2 py-0.5 rounded text-red-700 dark:text-red-400">
                 Acima de {limitePreceptor} alunos
               </span>
             </CardTitle>

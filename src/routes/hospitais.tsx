@@ -1750,10 +1750,10 @@ function GerenciarAlocacaoPreceptorDialog({
               </div>
 
               <div className="grid grid-cols-2 gap-3 border-t pt-3">
-                <div className="grid gap-2"><Label>Data Início</Label><Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} /></div>
-                <div className="grid gap-2"><Label>Data Fim</Label><Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} /></div>
-                <div className="grid gap-2"><Label>Hora Início</Label><Input type="time" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} /></div>
-                <div className="grid gap-2"><Label>Hora Fim</Label><Input type="time" value={horaFim} onChange={e => setHoraFim(e.target.value)} /></div>
+                <div className="grid gap-2"><Label>Data Início</Label><Input className="dark:[color-scheme:dark]" type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} /></div>
+                <div className="grid gap-2"><Label>Data Fim</Label><Input className="dark:[color-scheme:dark]" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} /></div>
+                <div className="grid gap-2"><Label>Hora Início</Label><Input className="dark:[color-scheme:dark]" type="time" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} /></div>
+                <div className="grid gap-2"><Label>Hora Fim</Label><Input className="dark:[color-scheme:dark]" type="time" value={horaFim} onChange={e => setHoraFim(e.target.value)} /></div>
               </div>
             </div>
           )}
