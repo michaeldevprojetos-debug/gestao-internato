@@ -532,7 +532,7 @@ function Dashboard() {
       </Sheet>
 
       {/* ── HEADER & FILTROS ── */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 bg-slate-900/50 p-6 rounded-xl border border-slate-800 shadow-lg backdrop-blur-sm relative overflow-hidden">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 bg-slate-100 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg backdrop-blur-sm relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent pointer-events-none" />
 
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -540,10 +540,10 @@ function Dashboard() {
             <Activity className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
               Dashboard Executivo
             </h1>
-            <p className="text-slate-400 text-sm mt-1 font-medium">
+            <p className="text-slate-600 dark:text-slate-400 text-sm mt-1 font-medium">
               Visão consolidada da distribuição acadêmica e preceptoria da Afya.
             </p>
           </div>
@@ -551,7 +551,7 @@ function Dashboard() {
 
         <div className="relative z-10 flex flex-wrap xl:flex-nowrap items-center gap-3">
           <Select value={selectedMes} onValueChange={setSelectedMes}>
-            <SelectTrigger className="w-[180px] bg-slate-900/80 border-slate-700 text-slate-200">
+            <SelectTrigger className="w-[180px] bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
               <SelectValue placeholder="Todos os Meses" />
             </SelectTrigger>
             <SelectContent className="max-h-80">
@@ -563,7 +563,7 @@ function Dashboard() {
           </Select>
 
           <Select value={selectedUnidade} onValueChange={setSelectedUnidade}>
-            <SelectTrigger className="w-[180px] bg-slate-900/80 border-slate-700 text-slate-200">
+            <SelectTrigger className="w-[180px] bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
               <SelectValue placeholder="Todas as Unidades" />
             </SelectTrigger>
             <SelectContent className="max-h-80">
@@ -575,7 +575,7 @@ function Dashboard() {
           </Select>
 
           <Select value={selectedEspecialidade} onValueChange={setSelectedEspecialidade}>
-            <SelectTrigger className="w-[180px] bg-slate-900/80 border-slate-700 text-slate-200">
+            <SelectTrigger className="w-[180px] bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
               <SelectValue placeholder="Todas as Especialidades" />
             </SelectTrigger>
             <SelectContent className="max-h-80">
@@ -587,7 +587,7 @@ function Dashboard() {
           </Select>
 
           <Select value={selectedPreceptor} onValueChange={setSelectedPreceptor}>
-            <SelectTrigger className="w-[180px] bg-slate-900/80 border-slate-700 text-slate-200">
+            <SelectTrigger className="w-[180px] bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
               <SelectValue placeholder="Todos os Preceptores" />
             </SelectTrigger>
             <SelectContent className="max-h-80">
@@ -656,7 +656,7 @@ function Dashboard() {
       {/* ── GRÁFICOS ── */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Ranking Preceptores — clicável */}
-        <Card className="lg:col-span-2 shadow-md border-white/10 dark:bg-slate-900/40">
+        <Card className="lg:col-span-2 shadow-md dark:shadow-none border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/40">
           <CardHeader>
             <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200">
               Ranking de Preceptores (Top 10)
@@ -739,7 +739,7 @@ function Dashboard() {
         </Card>
 
         {/* Pizza Especialidades */}
-        <Card className="shadow-md border-white/10 dark:bg-slate-900/40">
+        <Card className="shadow-md dark:shadow-none border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/40">
           <CardHeader>
             <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200">
               Alunos por Especialidade
@@ -790,7 +790,7 @@ function Dashboard() {
       </div>
 
       {/* ── TABELA: DISTRIBUIÇÃO ACADÊMICA ── */}
-      <Card className="shadow-md border-white/10 dark:bg-slate-900/40 overflow-hidden">
+      <Card className="shadow-md dark:shadow-none border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/40 overflow-hidden">
         <CardHeader className="border-b border-slate-100 dark:border-slate-800">
           <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-200">
             Distribuição Acadêmica

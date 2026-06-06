@@ -99,7 +99,7 @@ function PreceptoresPage() {
       const [precRes, espRes] = await Promise.all([
         supabase
           .from("preceptores" as any)
-          .select("id, nome, especialidade_id, ativo, tipo_remuneracao, valor_hora, especialidades(nome)")
+          .select("id, nome, especialidade_id, tipo_remuneracao, valor_hora_preceptor, especialidades(nome)")
           .order("nome"),
         supabase
           .from("especialidades" as any)
@@ -107,8 +107,16 @@ function PreceptoresPage() {
           .order("nome"),
       ]);
 
-      if (precRes.error) throw precRes.error;
-      if (espRes.error) throw espRes.error;
+      if (precRes.error) {
+        console.error("Erro na busca de preceptores:", precRes.error);
+        toast.error("Erro ao buscar preceptores: " + precRes.error.message);
+        throw precRes.error;
+      }
+      if (espRes.error) {
+        console.error("Erro na busca de especialidades:", espRes.error);
+        toast.error("Erro ao buscar especialidades: " + espRes.error.message);
+        throw espRes.error;
+      }
 
       setEspecialidades((espRes.data || []) as unknown as Especialidade[]);
 
@@ -119,7 +127,7 @@ function PreceptoresPage() {
         especialidade_nome: p.especialidades?.nome || null,
         ativo: p.ativo ?? true,
         tipo_remuneracao: p.tipo_remuneracao || "Bolsa",
-        valor_hora: p.valor_hora || 80.00,
+        valor_hora: p.valor_hora_preceptor || 80.00,
       }));
       return rows;
     }
@@ -415,9 +423,8 @@ function PreceptorDialog({
       const data = {
         nome,
         especialidade_id: especialidadeId === "none" ? null : especialidadeId,
-        ativo,
         tipo_remuneracao: tipoRemuneracao,
-        valor_hora: valorHora === "" ? 0 : Number(valorHora),
+        valor_hora_preceptor: valorHora === "" ? 0 : Number(valorHora),
       };
 
       if (isEdit && preceptor) {
