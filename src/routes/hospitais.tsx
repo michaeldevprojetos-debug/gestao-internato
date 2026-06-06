@@ -999,6 +999,8 @@ function AlunoMultiSelect({
   const [loading, setLoading] = useState(false);
   const [selectedAlunosCache, setSelectedAlunosCache] = useState<AlunoSimple[]>([]);
 
+  const isDateTimeValid = Boolean(dataInicio && dataFim && horaInicio && horaFim);
+
   useEffect(() => {
     if (!open && options.length === 0 && !search) return;
     const fetchAlunos = async () => {
@@ -1138,11 +1140,14 @@ function AlunoMultiSelect({
             variant="outline"
             size="sm"
             className="w-full justify-between h-8 text-xs font-normal"
+            disabled={!isDateTimeValid}
           >
             <span className="text-muted-foreground truncate">
-              {selectedAlunoIds.length > 0
+              {!isDateTimeValid 
+                ? "Preencha a data e horário primeiro..." 
+                : selectedAlunoIds.length > 0
                 ? `${selectedAlunoIds.length} aluno(s) selecionado(s)`
-                : "Selecionar alunos…"}
+                : "Buscar aluno…"}
             </span>
             <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
           </Button>
@@ -1166,7 +1171,7 @@ function AlunoMultiSelect({
                         key={a.id} 
                         value={a.id} 
                         onSelect={() => toggle(a)}
-                        className={cn(a.isOcupado && "opacity-50 cursor-not-allowed")}
+                        className={cn(a.isOcupado && "cursor-not-allowed bg-muted/20")}
                       >
                         <Check
                           className={cn(
@@ -1174,11 +1179,11 @@ function AlunoMultiSelect({
                             isChecked ? "opacity-100" : "opacity-0",
                           )}
                         />
-                        <span className="flex-1 truncate">
+                        <span className={cn("flex-1 truncate", a.isOcupado && "text-slate-400")}>
                           {a.nome} | Mat: {a.matricula || 'N/A'} | {a.semestre || '-'}º Sem.
                         </span>
                         {a.isOcupado && (
-                          <span className="text-destructive text-[10px] ml-2 shrink-0">
+                          <span className="text-amber-500 font-medium text-[10px] ml-2 shrink-0">
                             ⚠️ Ocupado neste horário ({a.ocupadoLocal})
                           </span>
                         )}
@@ -1219,25 +1224,7 @@ function GerenciarUnidadeDialog({
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<string>("Outro");
   const [saving, setSaving] = useState(false);
-<<<<<<< HEAD
-=======
-  const [preceptoresOptions, setPreceptoresOptions] = useState<PreceptorSimple[]>([]);
-  // Per-preceptor student selections: Map<preceptorKey, string[]>
-  const [preceptorAlunos, setPreceptorAlunos] = useState<Record<string, string[]>>({});
-  
-  const [preceptorMes, setPreceptorMes] = useState<Record<string, string>>({});
-  const [preceptorSemestre, setPreceptorSemestre] = useState<Record<string, string>>({});
-  const [preceptorRotacao, setPreceptorRotacao] = useState<Record<string, string>>({});
-  const [preceptorChPrevista, setPreceptorChPrevista] = useState<Record<string, number | "">>({});
-  const [preceptorHorasRealizadas, setPreceptorHorasRealizadas] = useState<Record<string, number | "">>({});
-  const [rotacoesOptions, setRotacoesOptions] = useState<{id: string, nome: string}[]>([]);
-  
-  useEffect(() => {
-      supabase.from("rotacoes" as any).select("id, nome").order("nome").then(({data}) => {
-        if (data) setRotacoesOptions(data as unknown as {id: string, nome: string}[]);
-      });
-    }, []);
->>>>>>> 93743dfb526f6aa418cdcbb93b2f535b6ce7e823
+
 
   useEffect(() => {
     if (!open) return;
