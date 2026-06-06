@@ -1224,7 +1224,10 @@ function GerenciarUnidadeDialog({
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<string>("Outro");
   const [saving, setSaving] = useState(false);
+<<<<<<< HEAD
 
+=======
+>>>>>>> 4b6647212542b0d6f820b461d9ca2245ad905bf2
 
   useEffect(() => {
     if (!open) return;
@@ -1383,7 +1386,7 @@ function GerenciarAlocacaoPreceptorDialog({
 
   useEffect(() => {
     supabase.from("rotacoes" as any).select("id, nome").order("nome").then(({data}) => {
-      if (data) setRotacoesOptions(data);
+      if (data) setRotacoesOptions(data as unknown as {id: string, nome: string}[]);
     });
   }, []);
 
@@ -1436,10 +1439,11 @@ function GerenciarAlocacaoPreceptorDialog({
         .eq("preceptor_id", preceptor.id)
         .eq("unidade_id", unidadeId)
         .then(({ data }) => {
-          if (data && data.length > 0) {
-            setDataInicio(data[0].data_inicio || "");
-            setDataFim(data[0].data_fim || "");
-            const ids = data.map((a: any) => a.aluno_id).filter(Boolean);
+          const rows = data as any[] | null;
+          if (rows && rows.length > 0) {
+            setDataInicio(rows[0].data_inicio || "");
+            setDataFim(rows[0].data_fim || "");
+            const ids = rows.map((a: any) => a.aluno_id).filter(Boolean);
             setAlunoIds(ids);
           }
         });
@@ -1523,7 +1527,7 @@ function GerenciarAlocacaoPreceptorDialog({
         if (!fetchErr && extAloc) {
           const newStart = new Date(dataInicio || new Date().toISOString().split("T")[0]);
           const newEnd = dataFim ? new Date(dataFim) : new Date("2099-12-31");
-          for (const ext of extAloc) {
+          for (const ext of (extAloc as any[])) {
             const extStart = new Date(ext.data_inicio);
             const extEnd = ext.data_fim ? new Date(ext.data_fim) : new Date("2099-12-31");
             const datesOverlap = newStart <= extEnd && newEnd >= extStart;
@@ -1546,7 +1550,7 @@ function GerenciarAlocacaoPreceptorDialog({
       if (!pFetchErr && pAloc) {
         const newStart = new Date(dataInicio || new Date().toISOString().split("T")[0]);
         const newEnd = dataFim ? new Date(dataFim) : new Date("2099-12-31");
-        for (const ext of pAloc) {
+        for (const ext of (pAloc as any[])) {
           const extStart = new Date(ext.data_inicio);
           const extEnd = ext.data_fim ? new Date(ext.data_fim) : new Date("2099-12-31");
           const datesOverlap = newStart <= extEnd && newEnd >= extStart;
