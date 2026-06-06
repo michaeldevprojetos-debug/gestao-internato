@@ -1224,10 +1224,6 @@ function GerenciarUnidadeDialog({
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<string>("Outro");
   const [saving, setSaving] = useState(false);
-<<<<<<< HEAD
-
-=======
->>>>>>> 4b6647212542b0d6f820b461d9ca2245ad905bf2
 
   useEffect(() => {
     if (!open) return;
