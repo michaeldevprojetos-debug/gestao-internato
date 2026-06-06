@@ -73,6 +73,9 @@ type AlunoSimple = {
   id: string;
   nome: string;
   semestre: number | null;
+  matricula?: string | null;
+  isOcupado?: boolean;
+  ocupadoLocal?: string;
 };
 
 type LocalSimple = {
@@ -974,11 +977,21 @@ function AlunoMultiSelect({
   selectedAlunoIds,
   onChangeAlunoIds,
   preceptorNome,
+  dataInicio,
+  dataFim,
+  horaInicio,
+  horaFim,
+  unidadeId,
 }: {
   allAlunos: AlunoSimple[];
   selectedAlunoIds: string[];
   onChangeAlunoIds: (ids: string[]) => void;
   preceptorNome: string;
+  dataInicio?: string;
+  dataFim?: string;
+  horaInicio?: string;
+  horaFim?: string;
+  unidadeId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -991,13 +1004,60 @@ function AlunoMultiSelect({
     const fetchAlunos = async () => {
       setLoading(true);
       try {
-        let query = supabase.from("alunos").select("id, nome, semestre").order("nome").limit(50);
+        let query = supabase
+          .from("alunos")
+          .select("id, nome, semestre, matricula, alocacoes(unidade_id, data_inicio, data_fim, hora_inicio, hora_fim, unidades(nome))")
+          .order("nome")
+          .limit(50);
+        
         if (search.trim()) {
           query = query.ilike("nome", `%${search.trim()}%`);
         }
+        
         const { data, error } = await query;
         if (error) throw error;
-        setOptions(data || []);
+        
+        const mappedData = (data || []).map((a: any) => {
+          let isOcupado = false;
+          let ocupadoLocal = "";
+          
+          if (a.alocacoes && a.alocacoes.length > 0 && dataInicio && horaInicio && horaFim) {
+            const newStart = new Date(dataInicio);
+            const newEnd = dataFim ? new Date(dataFim) : new Date("2099-12-31");
+            
+            for (const ext of a.alocacoes) {
+              if (ext.unidade_id === unidadeId) continue; // Same unit is fine
+
+              const extStart = new Date(ext.data_inicio);
+              const extEnd = ext.data_fim ? new Date(ext.data_fim) : new Date("2099-12-31");
+              const datesOverlap = newStart <= extEnd && newEnd >= extStart;
+              
+              const eHI = ext.hora_inicio || "00:00";
+              const eHF = ext.hora_fim || "23:59";
+              const nHI = horaInicio;
+              const nHF = horaFim;
+              
+              const timesOverlap = nHI < eHF && nHF > eHI;
+              
+              if (datesOverlap && timesOverlap) {
+                isOcupado = true;
+                ocupadoLocal = ext.unidades?.nome || "Outra unidade";
+                break;
+              }
+            }
+          }
+          
+          return {
+            id: a.id,
+            nome: a.nome,
+            semestre: a.semestre,
+            matricula: a.matricula,
+            isOcupado,
+            ocupadoLocal,
+          };
+        });
+
+        setOptions(mappedData);
       } catch (err) {
         console.error("Erro ao buscar alunos:", err);
       } finally {
@@ -1007,9 +1067,10 @@ function AlunoMultiSelect({
 
     const timeoutId = setTimeout(fetchAlunos, 300);
     return () => clearTimeout(timeoutId);
-  }, [search, open]);
+  }, [search, open, dataInicio, dataFim, horaInicio, horaFim, unidadeId]);
 
   const toggle = (aluno: AlunoSimple) => {
+    if (aluno.isOcupado) return;
     const isSelected = selectedAlunoIds.includes(aluno.id);
     if (isSelected) {
       onChangeAlunoIds(selectedAlunoIds.filter((x) => x !== aluno.id));
@@ -1033,6 +1094,11 @@ function AlunoMultiSelect({
       allAlunos.find((a) => a.id === id);
     return found || { id, nome: "Carregando...", semestre: null };
   });
+
+  // FILTRO LOCAL E ORDENAÇÃO
+  const visibleOptions = options
+    .filter(a => !selectedAlunoIds.includes(a.id))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
 
   return (
     <div className="mt-2">
@@ -1088,25 +1154,32 @@ function AlunoMultiSelect({
               {loading && (
                 <div className="p-4 text-center text-xs text-muted-foreground">Buscando...</div>
               )}
-              {!loading && options.length === 0 && (
-                <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
+              {!loading && visibleOptions.length === 0 && (
+                <CommandEmpty>Nenhum aluno disponível encontrado.</CommandEmpty>
               )}
               <CommandGroup>
                 {!loading &&
-                  options.map((a) => {
+                  visibleOptions.map((a) => {
                     const isChecked = selectedAlunoIds.includes(a.id);
                     return (
-                      <CommandItem key={a.id} value={a.id} onSelect={() => toggle(a)}>
+                      <CommandItem 
+                        key={a.id} 
+                        value={a.id} 
+                        onSelect={() => toggle(a)}
+                        className={cn(a.isOcupado && "opacity-50 cursor-not-allowed")}
+                      >
                         <Check
                           className={cn(
                             "mr-2 h-3.5 w-3.5",
                             isChecked ? "opacity-100" : "opacity-0",
                           )}
                         />
-                        <span className="flex-1 truncate">{a.nome}</span>
-                        {a.semestre && (
-                          <span className="text-muted-foreground text-[10px] ml-2">
-                            {a.semestre}º sem.
+                        <span className="flex-1 truncate">
+                          {a.nome} | Mat: {a.matricula || 'N/A'} | {a.semestre || '-'}º Sem.
+                        </span>
+                        {a.isOcupado && (
+                          <span className="text-destructive text-[10px] ml-2 shrink-0">
+                            ⚠️ Ocupado neste horário ({a.ocupadoLocal})
                           </span>
                         )}
                       </CommandItem>
@@ -1127,6 +1200,7 @@ function AlunoMultiSelect({
 }
 
 // ─── Modal: Gerenciar Unidade (Formulário Inteligente) ────────────────────────
+
 
 function GerenciarUnidadeDialog({
   open,
@@ -1621,6 +1695,11 @@ function GerenciarAlocacaoPreceptorDialog({
                   selectedAlunoIds={alunoIds}
                   onChangeAlunoIds={setAlunoIds}
                   preceptorNome={selectedPreceptor.nome}
+                  dataInicio={dataInicio}
+                  dataFim={dataFim}
+                  horaInicio={horaInicio}
+                  horaFim={horaFim}
+                  unidadeId={unidadeId}
                 />
               </div>
 
