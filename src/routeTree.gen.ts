@@ -14,7 +14,6 @@ import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as RotacoesRouteImport } from './routes/rotacoes'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as PreceptoresRouteImport } from './routes/preceptores'
-import { Route as Hospitais_bakRouteImport } from './routes/hospitais_bak'
 import { Route as HospitaisRouteImport } from './routes/hospitais'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
@@ -47,11 +46,6 @@ const RelatoriosRoute = RelatoriosRouteImport.update({
 const PreceptoresRoute = PreceptoresRouteImport.update({
   id: '/preceptores',
   path: '/preceptores',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const Hospitais_bakRoute = Hospitais_bakRouteImport.update({
-  id: '/hospitais_bak',
-  path: '/hospitais_bak',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HospitaisRoute = HospitaisRouteImport.update({
@@ -104,7 +98,6 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof ConfiguracoesRoute
   '/dashboard': typeof DashboardRoute
   '/hospitais': typeof HospitaisRoute
-  '/hospitais_bak': typeof Hospitais_bakRoute
   '/preceptores': typeof PreceptoresRoute
   '/relatorios': typeof RelatoriosRoute
   '/rotacoes': typeof RotacoesRoute
@@ -120,7 +113,6 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof ConfiguracoesRoute
   '/dashboard': typeof DashboardRoute
   '/hospitais': typeof HospitaisRoute
-  '/hospitais_bak': typeof Hospitais_bakRoute
   '/preceptores': typeof PreceptoresRoute
   '/relatorios': typeof RelatoriosRoute
   '/rotacoes': typeof RotacoesRoute
@@ -137,7 +129,6 @@ export interface FileRoutesById {
   '/configuracoes': typeof ConfiguracoesRoute
   '/dashboard': typeof DashboardRoute
   '/hospitais': typeof HospitaisRoute
-  '/hospitais_bak': typeof Hospitais_bakRoute
   '/preceptores': typeof PreceptoresRoute
   '/relatorios': typeof RelatoriosRoute
   '/rotacoes': typeof RotacoesRoute
@@ -155,7 +146,6 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/hospitais'
-    | '/hospitais_bak'
     | '/preceptores'
     | '/relatorios'
     | '/rotacoes'
@@ -171,7 +161,6 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/hospitais'
-    | '/hospitais_bak'
     | '/preceptores'
     | '/relatorios'
     | '/rotacoes'
@@ -187,7 +176,6 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/hospitais'
-    | '/hospitais_bak'
     | '/preceptores'
     | '/relatorios'
     | '/rotacoes'
@@ -204,7 +192,6 @@ export interface RootRouteChildren {
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   DashboardRoute: typeof DashboardRoute
   HospitaisRoute: typeof HospitaisRoute
-  Hospitais_bakRoute: typeof Hospitais_bakRoute
   PreceptoresRoute: typeof PreceptoresRoute
   RelatoriosRoute: typeof RelatoriosRoute
   RotacoesRoute: typeof RotacoesRoute
@@ -247,13 +234,6 @@ declare module '@tanstack/react-router' {
       path: '/preceptores'
       fullPath: '/preceptores'
       preLoaderRoute: typeof PreceptoresRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/hospitais_bak': {
-      id: '/hospitais_bak'
-      path: '/hospitais_bak'
-      fullPath: '/hospitais_bak'
-      preLoaderRoute: typeof Hospitais_bakRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hospitais': {
@@ -324,7 +304,6 @@ const rootRouteChildren: RootRouteChildren = {
   ConfiguracoesRoute: ConfiguracoesRoute,
   DashboardRoute: DashboardRoute,
   HospitaisRoute: HospitaisRoute,
-  Hospitais_bakRoute: Hospitais_bakRoute,
   PreceptoresRoute: PreceptoresRoute,
   RelatoriosRoute: RelatoriosRoute,
   RotacoesRoute: RotacoesRoute,
@@ -334,3 +313,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
