@@ -1377,7 +1377,7 @@ function GerenciarAlocacaoPreceptorDialog({
 
   useEffect(() => {
     supabase.from("rotacoes" as any).select("id, nome").order("nome").then(({data}) => {
-      if (data) setRotacoesOptions(data);
+      if (data) setRotacoesOptions(data as unknown as {id: string, nome: string}[]);
     });
   }, []);
 
