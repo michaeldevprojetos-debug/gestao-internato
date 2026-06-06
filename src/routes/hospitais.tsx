@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/command";
 import {
   Plus,
-  Pencil,
+  Pencil, Eraser,
   Building2,
   AlertCircle,
   Search,
@@ -761,7 +761,6 @@ function PreceptorCard({
   onClear?: () => void;
 }) {
   const { user } = useAuth();
-  const canClear = user?.role === "admin" || user?.role === "super_admin";
   const p = preceptor;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [localQtd, setLocalQtd] = useState(p.quantidadeAlunos);
@@ -799,15 +798,15 @@ function PreceptorCard({
               {p.especialidade}
             </Badge>
           )}
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-2">
+            {onClear && (
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-red-500 hover:bg-red-50/10 dark:hover:bg-red-950/50" onClick={(e) => { e.stopPropagation(); onClear(); }} title="Limpar registro deste preceptor no bloco">
+                <Eraser className="w-4 h-4 mr-2" /> <span>Limpar</span>
+              </Button>
+            )}
             {onEdit && (
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onEdit(); }} title="Editar alocação">
                 <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-              </Button>
-            )}
-            {canClear && onClear && (
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50" onClick={(e) => { e.stopPropagation(); onClear(); }} title="Limpar registro deste preceptor no bloco">
-                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>
