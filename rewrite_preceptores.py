@@ -1,4 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import os
+
+file_path = r"C:\Users\zinho.dam\Documents\Projeto de gestão do internato\gestao-internato-main\src\routes\preceptores.tsx"
+
+new_code = """import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -165,10 +169,7 @@ function PreceptoresPage() {
   };
 
   async function handleDelete(id: string, nome: string) {
-    if (!window.confirm(`ATENÇÃO DESTRUTIVA!
-
-Tem certeza que deseja inativar o preceptor "${nome}"?
-Isso poderá afetar seus vínculos e alocações ativas.`)) return;
+    if (!window.confirm(`ATENÇÃO DESTRUTIVA!\n\nTem certeza que deseja inativar o preceptor "${nome}"?\nIsso poderá afetar seus vínculos e alocações ativas.`)) return;
     try {
       const { error } = await supabase
         .from("preceptores" as any)
@@ -709,3 +710,9 @@ function DossierSheet({
     </Sheet>
   );
 }
+"""
+
+with open(file_path, "w", encoding="utf-8") as f:
+    f.write(new_code)
+
+print("Preceptores rewrite complete!")
