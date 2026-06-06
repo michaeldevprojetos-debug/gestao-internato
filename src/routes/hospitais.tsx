@@ -170,6 +170,22 @@ export const Route = createFileRoute("/hospitais")({
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 function HospitaisPage() {
+  const handleLimparPreceptor = async (unidadeId: string, preceptorId: string) => {
+    if (!window.confirm("Deseja limpar o registro deste preceptor nesta unidade? Os alunos vinculados a ele neste bloco também serão desvinculados.")) return;
+    try {
+      const { error } = await supabase
+        .from("alocacoes")
+        .delete()
+        .eq("unidade_id", unidadeId)
+        .eq("preceptor_id", preceptorId);
+      if (error) throw error;
+      toast.success("Vínculo do preceptor removido do bloco.");
+      queryClient.invalidateQueries({ queryKey: ["hospitaisData"] });
+    } catch (e: any) {
+      toast.error("Erro ao limpar vínculo: " + e.message);
+    }
+  };
+
   const queryClient = useQueryClient();
   const [locais, setLocais] = useState<LocalRow[]>([]);
   const [filtered, setFiltered] = useState<LocalRow[]>([]);
@@ -689,6 +705,7 @@ function HospitaisPage() {
                                           limiteAlunos={limiteAlunos}
                                           onUpdateQuantidade={handleUpdateQuantidade}
                                           onEdit={() => setEditingPreceptor({ preceptor: p, unidadeId: u.id })}
+                                          handleLimparPreceptor={(id) => handleLimparPreceptor(u.id, id)}
                                         />
                                       );
                                     })}
@@ -750,7 +767,7 @@ function PreceptorCard({
   limiteAlunos,
   onUpdateQuantidade,
   onEdit,
-  onClear,
+  handleLimparPreceptor,
 }: {
   preceptor: LocalRow["preceptoresList"][number];
   students: LocalRow["alunosVinculados"];
@@ -758,7 +775,7 @@ function PreceptorCard({
   limiteAlunos: number;
   onUpdateQuantidade: (vinculoId: string | null, preceptorId: string, value: number) => void;
   onEdit?: () => void;
-  onClear?: () => void;
+  handleLimparPreceptor?: (id: string) => void;
 }) {
   const { user } = useAuth();
   const p = preceptor;
@@ -799,8 +816,8 @@ function PreceptorCard({
             </Badge>
           )}
           <div className="ml-auto flex items-center gap-2">
-            {onClear && (
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-red-500 hover:bg-red-50/10 dark:hover:bg-red-950/50" onClick={(e) => { e.stopPropagation(); onClear(); }} title="Limpar registro deste preceptor no bloco">
+            {handleLimparPreceptor && (
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-red-500 hover:bg-red-50/10 dark:hover:bg-red-950/50" onClick={(e) => { e.stopPropagation(); handleLimparPreceptor(p.id); }} title="Limpar registro deste preceptor no bloco">
                 <Eraser className="w-4 h-4 mr-2" /> <span>Limpar</span>
               </Button>
             )}
