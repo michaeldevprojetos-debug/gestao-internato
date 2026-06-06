@@ -180,7 +180,6 @@ function HospitaisPage() {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLocal, setEditingLocal] = useState<LocalRow | null>(null);
-  const [editingPreceptor, setEditingPreceptor] = useState<{ preceptor: LocalRow["preceptoresList"][number] | null, unidadeId: string } | null>(null);
 
   const toggleRow = (id: string) => setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
 
@@ -645,15 +644,9 @@ function HospitaisPage() {
                           <TableRow className="bg-muted/5 hover:bg-muted/5">
                             <TableCell colSpan={7} className="p-4 pt-1">
                               <div className="rounded-lg border bg-card/50 p-4 shadow-inner">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                    Distribuição de Preceptores e Alunos
-                                  </h4>
-                                  <Button size="sm" variant="outline" onClick={() => setEditingPreceptor({ preceptor: null, unidadeId: u.id })}>
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Vincular Preceptor
-                                  </Button>
-                                </div>
+                                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
+                                  Distribuição de Preceptores e Alunos
+                                </h4>
 
                                 {u.preceptoresList.length === 0 ? (
                                   <p className="text-sm text-muted-foreground py-2">
@@ -684,7 +677,6 @@ function HospitaisPage() {
                                           exceeded={exceeded}
                                           limiteAlunos={limiteAlunos}
                                           onUpdateQuantidade={handleUpdateQuantidade}
-                                          onEdit={() => setEditingPreceptor({ preceptor: p, unidadeId: u.id })}
                                         />
                                       );
                                     })}
@@ -710,24 +702,9 @@ function HospitaisPage() {
         onOpenChange={setDialogOpen}
         local={editingLocal}
         allLocaisSimple={allLocaisSimple}
+        allAlunos={allAlunos}
         onSaved={() => {
           setDialogOpen(false);
-          fetchLocais();
-          queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
-          queryClient.invalidateQueries({ queryKey: ["alocacoes"] });
-        }}
-      />
-      
-      {/* ── Modal Gerenciar Alocação do Preceptor ── */}
-      <GerenciarAlocacaoPreceptorDialog
-        open={!!editingPreceptor}
-        onOpenChange={(o) => !o && setEditingPreceptor(null)}
-        preceptor={editingPreceptor?.preceptor ?? null}
-        unidadeId={editingPreceptor?.unidadeId ?? ""}
-        allAlunos={allAlunos}
-        allLocaisSimple={allLocaisSimple}
-        onSaved={() => {
-          setEditingPreceptor(null);
           fetchLocais();
           queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
           queryClient.invalidateQueries({ queryKey: ["alocacoes"] });
@@ -745,14 +722,12 @@ function PreceptorCard({
   exceeded,
   limiteAlunos,
   onUpdateQuantidade,
-  onEdit,
 }: {
   preceptor: LocalRow["preceptoresList"][number];
   students: LocalRow["alunosVinculados"];
   exceeded: boolean;
   limiteAlunos: number;
   onUpdateQuantidade: (vinculoId: string | null, preceptorId: string, value: number) => void;
-  onEdit?: () => void;
 }) {
   const p = preceptor;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -790,11 +765,6 @@ function PreceptorCard({
             <Badge variant="outline" className="text-[10px] py-0">
               {p.especialidade}
             </Badge>
-          )}
-          {onEdit && (
-            <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={(e) => { e.stopPropagation(); onEdit(); }} title="Editar alocação">
-              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
           )}
         </div>
 
@@ -1128,35 +1098,300 @@ function AlunoMultiSelect({
 
 // ─── Modal: Gerenciar Unidade (Formulário Inteligente) ────────────────────────
 
+type SelectedPreceptor =
+  | {
+      type: "existing";
+      id: string;
+      nome: string;
+    }
+  | {
+      type: "new";
+      nome: string;
+      tempId: string;
+    };
+
 function GerenciarUnidadeDialog({
   open,
   onOpenChange,
   local,
   allLocaisSimple,
+  allAlunos,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   local: LocalRow | null;
   allLocaisSimple: LocalSimple[];
+  allAlunos: AlunoSimple[];
   onSaved: () => void;
 }) {
   const isNew = !local;
+
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<string>("Outro");
+  const [preceptorEspecialidades, setPreceptorEspecialidades] = useState<Record<string, string>>({});
+  const [preceptorEspecialidadesCustom, setPreceptorEspecialidadesCustom] = useState<Record<string, string>>({});
+  const [selectedPreceptores, setSelectedPreceptores] = useState<SelectedPreceptor[]>([]);
+  const [preceptorSearch, setPreceptorSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [preceptoresOptions, setPreceptoresOptions] = useState<PreceptorSimple[]>([]);
+  // Per-preceptor student selections: Map<preceptorKey, string[]>
+  const [preceptorAlunos, setPreceptorAlunos] = useState<Record<string, string[]>>({});
+  
+  const [preceptorMes, setPreceptorMes] = useState<Record<string, string>>({});
+  const [preceptorSemestre, setPreceptorSemestre] = useState<Record<string, string>>({});
+  const [preceptorRotacao, setPreceptorRotacao] = useState<Record<string, string>>({});
+  const [preceptorChPrevista, setPreceptorChPrevista] = useState<Record<string, number | "">>({});
+  const [preceptorHorasRealizadas, setPreceptorHorasRealizadas] = useState<Record<string, number | "">>({});
+  const [rotacoesOptions, setRotacoesOptions] = useState<{id: string, nome: string}[]>([]);
+  
+  useEffect(() => {
+      supabase.from("rotacoes" as any).select("id, nome").order("nome").then(({data}) => {
+        if (data) setRotacoesOptions(data);
+      });
+    }, []);
 
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+  const [horaInicio, setHoraInicio] = useState("08:00");
+  const [horaFim, setHoraFim] = useState("12:00");
+
+
+    // Cálculo automático de Horas Realizadas
+    useEffect(() => {
+      if (!dataInicio || !dataFim || !horaInicio || !horaFim) return;
+      try {
+        const start = new Date(dataInicio);
+        const end = new Date(dataFim);
+        if (end < start) return;
+        
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        
+        const [h1, m1] = horaInicio.split(":").map(Number);
+        const [h2, m2] = horaFim.split(":").map(Number);
+        
+        let diffHours = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
+        if (diffHours < 0) diffHours += 24;
+        
+        const chCalculada = Math.round(diffDays * diffHours);
+        
+        if (chCalculada > 0) {
+          setPreceptorHorasRealizadas(prev => {
+            const newCh = { ...prev };
+            selectedPreceptores.forEach(tag => {
+              const key = tag.type === "existing" ? tag.id : tag.tempId;
+              // Preenche automaticamente o campo
+              newCh[key] = chCalculada;
+            });
+            return newCh;
+          });
+        }
+      } catch (e) {
+        // ignore
+      }
+    }, [dataInicio, dataFim, horaInicio, horaFim, selectedPreceptores]);
+
+
+  // Carregar preceptores diretamente no modal ao abrir
+  useEffect(() => {
+    if (!open) return;
+    const fetchPreceptores = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("preceptores")
+          .select("id, nome, especialidade")
+          .order("nome");
+        if (error) throw error;
+        setPreceptoresOptions((data ?? []) as PreceptorSimple[]);
+      } catch (err: any) {
+        console.error("Erro ao carregar preceptores no modal:", err);
+        toast.error("Erro ao carregar lista de preceptores.");
+      }
+    };
+    fetchPreceptores();
+  }, [open]);
+
+  // Popula o formulário ao abrir
   useEffect(() => {
     if (!open) return;
     setNome(local?.nome ?? "");
     setTipo(local?.tipo ?? "Outro");
+    setPreceptorEspecialidades({});
+    setPreceptorEspecialidadesCustom({});
+    setSelectedPreceptores(
+      local?.preceptoresList.map((p) => ({ type: "existing" as const, id: p.id, nome: p.nome })) ??
+        [],
+    );
+    setPreceptorSearch("");
+    // Initialize per-preceptor aluno selections from existing data using Direct ID mapping
+    const initialAlunos: Record<string, string[]> = {};
+    const initialEspecialidades: Record<string, string> = {};
+    const initialEspecialidadesCustom: Record<string, string> = {};
+    const initialMes: Record<string, string> = {};
+    const initialSemestre: Record<string, string> = {};
+    const initialRotacao: Record<string, string> = {};
+    const initialCh: Record<string, number | ""> = {};
+    const initialHoras: Record<string, number | ""> = {};
+
+    if (local) {
+      for (const p of local.preceptoresList) {
+        const studentIds = local.alunosVinculados
+          .filter((a) => a.preceptor_id === p.id)
+          .map((a) => a.aluno_id);
+        if (studentIds.length > 0) initialAlunos[p.id] = studentIds;
+
+        if (p.mes_referencia) initialMes[p.id] = p.mes_referencia;
+        if (p.semestre) initialSemestre[p.id] = p.semestre;
+        if (p.rotacao_periodo_id) initialRotacao[p.id] = p.rotacao_periodo_id;
+        if (p.ch_prevista) initialCh[p.id] = p.ch_prevista;
+        if (p.horas_realizadas) initialHoras[p.id] = p.horas_realizadas;
+
+        if (p.especialidade) {
+          if (ESPECIALIDADES_COMUNS.includes(p.especialidade as any)) {
+            initialEspecialidades[p.id] = p.especialidade;
+          } else {
+            initialEspecialidades[p.id] = "Outra";
+            initialEspecialidadesCustom[p.id] = p.especialidade;
+          }
+        }
+      }
+    }
+    setPreceptorAlunos(initialAlunos);
+    setPreceptorEspecialidades(initialEspecialidades);
+    setPreceptorEspecialidadesCustom(initialEspecialidadesCustom);
+    setPreceptorMes(initialMes);
+    setPreceptorSemestre(initialSemestre);
+    setPreceptorRotacao(initialRotacao);
+    setPreceptorChPrevista(initialCh);
+    setPreceptorHorasRealizadas(initialHoras);
   }, [open, local]);
 
+  const toggleExisting = (p: PreceptorSimple) => {
+    setSelectedPreceptores((prev) => {
+      const exists = prev.find((t) => t.type === "existing" && t.id === p.id);
+      if (exists) {
+        // Remove from tags and clear aluno selections
+        setPreceptorAlunos((pa) => {
+          const copy = { ...pa };
+          delete copy[p.id];
+          return copy;
+        });
+        setPreceptorEspecialidades((pe) => {
+          const copy = { ...pe };
+          delete copy[p.id];
+          return copy;
+        });
+        setPreceptorEspecialidadesCustom((pec) => {
+          const copy = { ...pec };
+          delete copy[p.id];
+          return copy;
+        });
+        return prev.filter((t) => !(t.type === "existing" && t.id === p.id));
+      }
+      
+      // Initialize specialty when adding existing preceptor
+      if (p.especialidade) {
+        if (ESPECIALIDADES_COMUNS.includes(p.especialidade as any)) {
+          setPreceptorEspecialidades((pe) => ({ ...pe, [p.id]: p.especialidade! }));
+        } else {
+          setPreceptorEspecialidades((pe) => ({ ...pe, [p.id]: "Outra" }));
+          setPreceptorEspecialidadesCustom((pec) => ({ ...pec, [p.id]: p.especialidade! }));
+        }
+      }
+      
+      return [...prev, { type: "existing", id: p.id, nome: p.nome }];
+    });
+  };
+
+  const removePreceptor = (tag: SelectedPreceptor) => {
+    const key = tag.type === "existing" ? tag.id : tag.tempId;
+    setPreceptorAlunos((pa) => {
+      const copy = { ...pa };
+      delete copy[key];
+      return copy;
+    });
+    setPreceptorEspecialidades((pe) => {
+      const copy = { ...pe };
+      delete copy[key];
+      return copy;
+    });
+    setPreceptorEspecialidadesCustom((pec) => {
+      const copy = { ...pec };
+      delete copy[key];
+      return copy;
+    });
+    setSelectedPreceptores((prev) => {
+      if (tag.type === "existing")
+        return prev.filter((t) => !(t.type === "existing" && t.id === tag.id));
+      return prev.filter((t) => !(t.type === "new" && t.tempId === tag.tempId));
+    });
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter" || !preceptorSearch.trim()) return;
+    e.preventDefault();
+    const searchLower = preceptorSearch.trim().toLowerCase();
+
+    const matchingExisting = preceptoresOptions.find((p) => p.nome.toLowerCase() === searchLower);
+    if (matchingExisting) {
+      const alreadySelected = selectedPreceptores.find(
+        (t) => t.type === "existing" && t.id === matchingExisting.id,
+      );
+      if (!alreadySelected) {
+        setSelectedPreceptores((prev) => [
+          ...prev,
+          { type: "existing", id: matchingExisting.id, nome: matchingExisting.nome },
+        ]);
+      }
+      setPreceptorSearch("");
+      return;
+    }
+
+    const alreadyNew = selectedPreceptores.find(
+      (t) => t.type === "new" && t.nome.toLowerCase() === searchLower,
+    );
+    if (alreadyNew) {
+      setPreceptorSearch("");
+      return;
+    }
+
+    setSelectedPreceptores((prev) => [
+      ...prev,
+      {
+        type: "new",
+        nome: preceptorSearch.trim(),
+        tempId: crypto.randomUUID(),
+      },
+    ]);
+    setPreceptorSearch("");
+  };
+
+  const visiblePreceptores = preceptoresOptions.filter((p) =>
+    p.nome.toLowerCase().includes(preceptorSearch.toLowerCase()),
+  );
+
+  const isSelected = (id: string) =>
+    selectedPreceptores.some((t) => t.type === "existing" && t.id === id);
+
+  // Compute total alunos across all preceptors
+  const totalAlunosSelecionados = Object.values(preceptorAlunos).reduce(
+    (sum, ids) => sum + ids.length,
+    0,
+  );
+
+  // Helper to update aluno selections for a specific preceptor key
+  const updatePreceptorAlunos = (key: string, ids: string[]) => {
+    setPreceptorAlunos((prev) => ({ ...prev, [key]: ids }));
+  };
+
+  // Combobox options from locais list
   const locaisOptions = allLocaisSimple.map((l) => ({
     value: l.id,
     label: l.nome,
   }));
 
+  // Auto-detect tipo when selecting an existing local
   const handleNomeChange = (val: string) => {
     setNome(val);
     const matchedLocal = allLocaisSimple.find((l) => l.nome === val);
@@ -1170,9 +1405,99 @@ function GerenciarUnidadeDialog({
       toast.warning("Informe o nome da unidade.");
       return;
     }
+    
+    // --- INÍCIO VALIDAÇÃO ANTI-CONFLITO ---
+    const allSelectedStudentIds = Array.from(new Set(
+      selectedPreceptores.flatMap(tag => {
+        const key = tag.type === "existing" ? tag.id : tag.tempId;
+        return preceptorAlunos[key] ?? [];
+      })
+    ));
+
+    if (allSelectedStudentIds.length > 0) {
+      const { data: existingAlocacoes, error: fetchErr } = (await supabase
+        .from("alocacoes" as any)
+        .select("id, aluno_id, unidade_id, preceptor_id, especialidade_id, data_inicio, data_fim, hora_inicio, hora_fim")
+        .in("aluno_id", allSelectedStudentIds)) as { data: any[] | null; error: any };
+
+      if (!fetchErr && existingAlocacoes) {
+        const newStart = new Date(dataInicio || new Date().toISOString().split("T")[0]);
+        const newEnd = dataFim ? new Date(dataFim) : new Date("2099-12-31");
+        
+        const nHI = horaInicio || "00:00";
+        const nHF = horaFim || "23:59";
+
+        for (const ext of existingAlocacoes) {
+          // Ignorar se estiver editando a própria unidade e sobrescrevendo,
+          // mas wait, o usuário disse: Se a unidade for DIFERENTE, barra. Se for a MESMA, permite se preceptor+esp for diferente.
+          // Na verdade, the user says if it's the SAME unidade but different preceptor/especialidade it is allowed (internal rotation).
+          
+          const extStart = new Date(ext.data_inicio);
+          const extEnd = ext.data_fim ? new Date(ext.data_fim) : new Date("2099-12-31");
+          
+          const eHI = ext.hora_inicio || "00:00";
+          const eHF = ext.hora_fim || "23:59";
+
+          const datesOverlap = newStart <= extEnd && newEnd >= extStart;
+          const timesOverlap = nHI < eHF && nHF > eHI;
+
+          if (datesOverlap && timesOverlap) {
+            // Conflito de tempo detectado para o aluno ext.aluno_id
+            
+            const savingLocalId = local?.id;
+            if (ext.unidade_id !== savingLocalId) {
+              toast.error("Conflito: Um ou mais alunos selecionados já possuem alocação em outra unidade neste mesmo dia e horário!");
+              return;
+            }
+          }
+        }
+      }
+    }
+    // --- FIM VALIDAÇÃO ANTI-CONFLITO ALUNOS ---
+
+    // --- INÍCIO VALIDAÇÃO ANTI-CONFLITO PRECEPTORES ---
+    const allSelectedPreceptorIds = Array.from(new Set(
+      selectedPreceptores.map(tag => tag.type === "existing" ? tag.id : null).filter(Boolean) as string[]
+    ));
+
+    if (allSelectedPreceptorIds.length > 0) {
+      const { data: preceptorAlocacoes, error: pFetchErr } = (await supabase
+        .from("alocacoes" as any)
+        .select("id, preceptor_id, unidade_id, data_inicio, data_fim, hora_inicio, hora_fim")
+        .in("preceptor_id", allSelectedPreceptorIds)) as { data: any[] | null; error: any };
+
+      if (!pFetchErr && preceptorAlocacoes) {
+        const newStart = new Date(dataInicio || new Date().toISOString().split("T")[0]);
+        const newEnd = dataFim ? new Date(dataFim) : new Date("2099-12-31");
+        const nHI = horaInicio || "00:00";
+        const nHF = horaFim || "23:59";
+
+        for (const ext of preceptorAlocacoes) {
+          const extStart = new Date(ext.data_inicio);
+          const extEnd = ext.data_fim ? new Date(ext.data_fim) : new Date("2099-12-31");
+          const eHI = ext.hora_inicio || "00:00";
+          const eHF = ext.hora_fim || "23:59";
+
+          const datesOverlap = newStart <= extEnd && newEnd >= extStart;
+          const timesOverlap = nHI < eHF && nHF > eHI;
+
+          if (datesOverlap && timesOverlap) {
+            const savingLocalId = local?.id;
+            if (ext.unidade_id !== savingLocalId) {
+              toast.error("Conflito de Agenda: Este preceptor já está escalado para prestar atendimento em outro hospital neste mesmo dia e horário!");
+              return;
+            }
+          }
+        }
+      }
+    }
+    // --- FIM VALIDAÇÃO ANTI-CONFLITO PRECEPTORES ---
+
     setSaving(true);
     try {
       let localId: string = local?.id ?? "";
+
+      // ── Verificar se o local já existe pelo nome ou criar novo ──
       const matchedLocal = allLocaisSimple.find(
         (l) => l.nome.toLowerCase() === nome.trim().toLowerCase(),
       );
@@ -1183,6 +1508,7 @@ function GerenciarUnidadeDialog({
           const { error } = await supabase.from("unidades" as any).update({ tipo }).eq("id", localId);
           if (error) throw error;
         } else {
+          // Criar novo local
           const { data, error } = (await supabase
             .from("unidades" as any)
             .insert({ nome: nome.trim(), tipo })
@@ -1198,6 +1524,158 @@ function GerenciarUnidadeDialog({
           .eq("id", local!.id);
         if (error) throw error;
       }
+
+      // ── Criar preceptores temporários (tags novas) ──
+      const newTags = selectedPreceptores.filter((t) => t.type === "new");
+      const tempIdToRealId = new Map<string, string>();
+
+      for (const tag of newTags) {
+        const pEsp = preceptorEspecialidades[tag.tempId];
+        const pEspCust = preceptorEspecialidadesCustom[tag.tempId];
+        const finalEsp = pEsp === "Outra" ? (pEspCust?.trim() || "") : pEsp;
+
+        const insertData: Record<string, any> = {
+          nome: tag.nome,
+        };
+        if (finalEsp) insertData.especialidade = finalEsp;
+
+        const { data, error } = await supabase
+          .from("preceptores")
+          .insert(insertData)
+          .select("id")
+          .single();
+        if (error) throw error;
+        tempIdToRealId.set(tag.tempId, data.id);
+      }
+
+      // ── Vincular preceptores existentes selecionados ──
+      const existingIds = selectedPreceptores
+        .filter((t) => t.type === "existing")
+        .map((t) => (t as { type: "existing"; id: string }).id);
+
+      const newCreatedIds = Array.from(tempIdToRealId.values());
+      const allSelectedIds = [...existingIds, ...newCreatedIds];
+
+      if (allSelectedIds.length > 0) {
+        // Prevent updating local_id for existing preceptors if it causes FK issues, 
+        // but we'll stick to just updating what's needed. We update local_id only for new preceptors 
+        // since existing ones might belong to other units. Actually, the user asked to fix the FK error, 
+        // which implies we shouldn't arbitrarily change local_id for existing preceptors if they are shared.
+        // Let's only update especialidade per preceptor.
+
+        for (const existingId of existingIds) {
+          const pEsp = preceptorEspecialidades[existingId];
+          const pEspCust = preceptorEspecialidadesCustom[existingId];
+          const finalEsp = pEsp === "Outra" ? (pEspCust?.trim() || "") : pEsp;
+
+          if (finalEsp) {
+            const { error: errEsp } = await supabase
+              .from("preceptores" as any)
+              .update({ especialidade: finalEsp })
+              .eq("id", existingId);
+            if (errEsp) throw errEsp;
+          }
+        }
+      }
+
+      // ── Limpar vínculos operacionais antigos (evita duplicações) ──
+      if (local && local.preceptoresList.length > 0) {
+        const preceptorIdsOfLocal = local.preceptoresList.map((p) => p.id);
+        const { error: deleteError } = await supabase
+          .from("alocacoes" as any)
+          .delete()
+          .eq("unidade_id", localId)
+          .in("preceptor_id", preceptorIdsOfLocal);
+        if (deleteError) throw deleteError;
+
+        // Desvincular alunos cujo preceptor_id atual pertencia a esta unidade
+        const { error: unsetError } = await supabase
+          .from("alunos" as any)
+          .update({ preceptor_id: null })
+          .in("preceptor_id", preceptorIdsOfLocal);
+        if (unsetError) throw unsetError;
+      }
+
+      // ── Criar vínculos operacionais com alunos selecionados ──
+      const alocacoesToInsert: Array<{
+        preceptor_id: string;
+        aluno_id: string | null;
+        unidade_id: string;
+        data_inicio: string;
+        data_fim: string | null;
+        hora_inicio: string | null;
+        hora_fim: string | null;
+        mes_referencia?: string | null;
+        semestre?: string | null;
+        rotacao_periodo_id?: string | null;
+        ch_prevista?: number | null;
+        horas_realizadas?: number | null;
+      }> = [];
+
+      for (const tag of selectedPreceptores) {
+        const key = tag.type === "existing" ? tag.id : tag.tempId;
+        const realPreceptorId = tag.type === "existing" ? tag.id : tempIdToRealId.get(tag.tempId);
+        if (!realPreceptorId) continue;
+
+        const selectedStudents = preceptorAlunos[key] ?? [];
+        if (selectedStudents.length > 0) {
+          for (const alunoId of selectedStudents) {
+            alocacoesToInsert.push({
+              preceptor_id: realPreceptorId,
+              aluno_id: alunoId,
+              unidade_id: localId,
+              data_inicio: dataInicio || new Date().toISOString().split("T")[0],
+              data_fim: dataFim || null,
+              hora_inicio: horaInicio || null,
+              hora_fim: horaFim || null,
+              mes_referencia: preceptorMes[key] || null,
+              semestre: preceptorSemestre[key] || null,
+              rotacao_periodo_id: preceptorRotacao[key] || null,
+              ch_prevista: preceptorChPrevista[key] || null,
+              horas_realizadas: preceptorHorasRealizadas[key] || null,
+            });
+          }
+        } else {
+          alocacoesToInsert.push({
+            preceptor_id: realPreceptorId,
+            aluno_id: null,
+            unidade_id: localId,
+            data_inicio: dataInicio || new Date().toISOString().split("T")[0],
+            data_fim: dataFim || null,
+            hora_inicio: horaInicio || null,
+            hora_fim: horaFim || null,
+            mes_referencia: preceptorMes[key] || null,
+            semestre: preceptorSemestre[key] || null,
+            rotacao_periodo_id: preceptorRotacao[key] || null,
+            ch_prevista: preceptorChPrevista[key] || null,
+            horas_realizadas: preceptorHorasRealizadas[key] || null,
+          });
+        }
+      }
+
+      if (alocacoesToInsert.length > 0) {
+        const { error: alocError } = await supabase
+          .from("alocacoes" as any)
+          .insert(alocacoesToInsert);
+        if (alocError) throw alocError;
+      }
+
+      // ── UPDATE alunos.preceptor_id para refletir a vinculação ──
+      for (const tag of selectedPreceptores) {
+        const key = tag.type === "existing" ? tag.id : tag.tempId;
+        const realPreceptorId = tag.type === "existing" ? tag.id : tempIdToRealId.get(tag.tempId);
+        if (!realPreceptorId) continue;
+        const selectedStudents = preceptorAlunos[key] ?? [];
+        if (selectedStudents.length === 0) continue;
+        const { error: updErr } = await supabase
+          .from("alunos")
+          .update({ preceptor_id: realPreceptorId })
+          .in("id", selectedStudents);
+        if (updErr) throw updErr;
+      }
+
+      // Desvincular preceptores removidos já é tratado limpando a tabela alocacoes.
+
       toast.success(isNew ? "Unidade criada com sucesso!" : "Unidade atualizada com sucesso!");
       onSaved();
     } catch (e: any) {
@@ -1209,475 +1687,342 @@ function GerenciarUnidadeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="h-5 w-5 text-primary" />
             {isNew ? "Nova Unidade" : `Gerenciar: ${local?.nome}`}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="g-nome">Nome da Unidade *</Label>
-            <SmartCombobox
-              id="g-nome"
-              value={nome}
-              onValueChange={handleNomeChange}
-              options={locaisOptions}
-              placeholder="Ex.: Hospital Municipal de Salvador"
-              emptyMessage="Nenhum local cadastrado."
-            />
+
+        <div className="grid gap-5 py-2 max-h-[65vh] overflow-y-auto pr-1">
+          {/* ── Nome (Combobox) + Tipo ── */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="g-nome">Nome da Unidade *</Label>
+              <SmartCombobox
+                id="g-nome"
+                value={nome}
+                onValueChange={handleNomeChange}
+                options={locaisOptions}
+                placeholder="Ex.: Hospital Municipal de Salvador"
+                emptyMessage="Nenhum local cadastrado."
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="g-tipo">Tipo *</Label>
+              <Select value={tipo} onValueChange={setTipo}>
+                <SelectTrigger id="g-tipo">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPOS_CAMPO.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="g-tipo">Tipo *</Label>
-            <Select value={tipo} onValueChange={setTipo}>
-              <SelectTrigger id="g-tipo">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TIPOS_CAMPO.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+          {/* ── Alocar Preceptores ── */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-semibold">Alocar Preceptores</p>
+              <Badge variant="secondary" className="ml-auto text-xs">
+                {selectedPreceptores.length} selecionado
+                {selectedPreceptores.length !== 1 ? "s" : ""}
+              </Badge>
+            </div>
+
+            <div className="relative mb-2">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar preceptor… (Enter para criar novo)"
+                className="pl-8"
+                value={preceptorSearch}
+                onChange={(e) => setPreceptorSearch(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+              />
+            </div>
+
+            <div className="rounded-md border divide-y overflow-y-auto max-h-44 bg-background">
+              {visiblePreceptores.length === 0 ? (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  {preceptorSearch.trim() ? (
+                    <span>
+                      Nenhum preceptor encontrado. Pressione{" "}
+                      <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">
+                        Enter
+                      </kbd>{" "}
+                      para criar.
+                    </span>
+                  ) : (
+                    "Nenhum preceptor encontrado."
+                  )}
+                </div>
+              ) : (
+                visiblePreceptores.slice(0, 50).map((p) => {
+                  const checked = isSelected(p.id);
+                  // Se o preceptor tem vínculos (preceptorUnits.get(p.id)) e algum deles não é a unidade atual
+                  const otherLocal =
+                    p.units && p.units.length > 0 && p.units.some((uId) => uId !== local?.id);
+
+                  return (
+                    <div
+                      key={p.id}
+                      className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
+                        checked ? "bg-primary/5" : "hover:bg-muted/50"
+                      }`}
+                      onClick={() => toggleExisting(p)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        readOnly
+                        className="h-4 w-4 rounded accent-primary cursor-pointer shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium leading-tight">{p.nome}</p>
+                        {p.especialidade && (
+                          <p className="text-xs text-muted-foreground">{p.especialidade}</p>
+                        )}
+                      </div>
+                      {otherLocal && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] shrink-0 text-amber-600 border-amber-400/50"
+                        >
+                          Em outra unidade
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+              {visiblePreceptores.length > 50 && (
+                <div className="px-3 py-2 text-center text-[10px] text-muted-foreground border-t">
+                  Mostrando 50 de {visiblePreceptores.length} — refine a busca
+                </div>
+              )}
+            </div>
+
+            {preceptoresOptions.length === 0 && !preceptorSearch && (
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Nenhum preceptor cadastrado no sistema.
+              </p>
+            )}
+          </div>
+
+
+          {/* ── Lista de preceptores alocados e suas vinculações de alunos ── */}
+          {selectedPreceptores.length > 0 && (
+            <div className="space-y-3 mt-2 pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Preceptores Selecionados e Alocação de Alunos
+                </Label>
+                <Badge variant="outline" className="text-xs font-bold">
+                  Total: {totalAlunosSelecionados} aluno(s)
+                </Badge>
+              </div>
+
+              <div className="space-y-3">
+                {selectedPreceptores.map((tag) => {
+                  const key = tag.type === "existing" ? tag.id : tag.tempId;
+                  const alunoIds = preceptorAlunos[key] ?? [];
+
+                  return (
+                    <div key={key} className="rounded-lg border border-border/60 bg-muted/10 p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-semibold">{tag.nome}</span>
+                          {tag.type === "new" && (
+                            <Badge variant="default" className="text-[9px] py-0 px-1.5">
+                              (novo)
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                              Alunos vinculados:
+                            </span>
+                            <Badge
+                              variant={alunoIds.length > 0 ? "secondary" : "outline"}
+                              className="font-bold text-xs min-w-[24px] h-5 justify-center"
+                            >
+                              {alunoIds.length}
+                            </Badge>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removePreceptor(tag)}
+                            className="rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                            title="Remover preceptor"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Especialidade do Preceptor */}
+                      <div className="mt-2 pt-2 border-t border-border/40 grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_1fr] gap-3">
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Especialidade
+                          </Label>
+                          <Select 
+                            value={preceptorEspecialidades[key] || ""} 
+                            onValueChange={(val) => setPreceptorEspecialidades((prev) => ({ ...prev, [key]: val }))}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ESPECIALIDADES_COMUNS.map((e) => (
+                                <SelectItem key={e} value={e} className="text-xs">
+                                  {e}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {preceptorEspecialidades[key] === "Outra" && (
+                          <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-transparent select-none sm:block hidden">
+                              Personalizada
+                            </Label>
+                            <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block sm:hidden">
+                              Especificar
+                            </Label>
+                            <Input
+                              placeholder="Digite a especialidade…"
+                              value={preceptorEspecialidadesCustom[key] || ""}
+                              onChange={(e) => setPreceptorEspecialidadesCustom((prev) => ({ ...prev, [key]: e.target.value }))}
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Rótulo e Componente de Alunos */}
+                      <div className="mt-2 pt-2 border-t border-border/40">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Quantidade de alunos por preceptor(a)
+                          </span>
+                        </div>
+                        <AlunoMultiSelect
+                          allAlunos={allAlunos}
+                          selectedAlunoIds={alunoIds}
+                          onChangeAlunoIds={(ids) => updatePreceptorAlunos(key, ids)}
+                          preceptorNome={tag.nome}
+                        />
+                      </div>
+
+                      {/* Novos campos financeiros e de auditoria */}
+                      <div className="mt-2 pt-2 border-t border-border/40 grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Mês Referência</Label>
+                          <Select value={preceptorMes[key] || ""} onValueChange={(val) => setPreceptorMes(p => ({...p, [key]: val}))}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Mês" /></SelectTrigger>
+                            <SelectContent>
+                              {["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"].map(m => (
+                                <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Semestre</Label>
+                          <Select value={preceptorSemestre[key] || ""} onValueChange={(val) => setPreceptorSemestre(p => ({...p, [key]: val}))}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sem." /></SelectTrigger>
+                            <SelectContent>
+                              {["9º", "10º", "11º", "12º"].map(m => (
+                                <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Período / Rotação</Label>
+                          <Select value={preceptorRotacao[key] || ""} onValueChange={(val) => setPreceptorRotacao(p => ({...p, [key]: val}))}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Rotação" /></SelectTrigger>
+                            <SelectContent>
+                              {rotacoesOptions.map(r => (
+                                <SelectItem key={r.id} value={r.id} className="text-xs">{r.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">CH Prevista</Label>
+                          <Input type="number" min={0} className="h-8 text-xs" value={preceptorChPrevista[key] || ""} onChange={(e) => setPreceptorChPrevista(p => ({...p, [key]: e.target.value ? Number(e.target.value) : ""}))} />
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">H. Realizadas</Label>
+                          <Input type="number" min={0} className="h-8 text-xs bg-muted/50 cursor-not-allowed" readOnly value={preceptorHorasRealizadas[key] || ""} title="Calculado automaticamente a partir das datas e horas" />
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t">
+            <div className="grid gap-2">
+              <Label>Data Início</Label>
+              <Input
+                type="date"
+                className="bg-background text-foreground border-input focus:ring-ring"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Data Fim</Label>
+              <Input
+                type="date"
+                className="bg-background text-foreground border-input focus:ring-ring"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Hora Início</Label>
+              <Input
+                type="time"
+                className="bg-background text-foreground border-input focus:ring-ring"
+                value={horaInicio}
+                onChange={(e) => setHoraInicio(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Hora Fim</Label>
+              <Input
+                type="time"
+                className="bg-background text-foreground border-input focus:ring-ring"
+                value={horaFim}
+                onChange={(e) => setHoraFim(e.target.value)}
+              />
+            </div>
           </div>
         </div>
+
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Salvando…" : isNew ? "Criar Unidade" : "Salvar Alterações"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ─── Modal: Gerenciar Alocação de Preceptor (Isolado) ────────────────────────
-
-function GerenciarAlocacaoPreceptorDialog({
-  open,
-  onOpenChange,
-  preceptor,
-  unidadeId,
-  allAlunos,
-  allLocaisSimple,
-  onSaved,
-}: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  preceptor: LocalRow["preceptoresList"][number] | null;
-  unidadeId: string;
-  allAlunos: AlunoSimple[];
-  allLocaisSimple: LocalSimple[];
-  onSaved: () => void;
-}) {
-  const isNew = !preceptor;
-
-  // Local state for isolation
-  const [selectedPreceptor, setSelectedPreceptor] = useState<PreceptorSimple | null>(null);
-  const [search, setSearch] = useState("");
-  const [preceptoresOptions, setPreceptoresOptions] = useState<PreceptorSimple[]>([]);
-
-  const [alunoIds, setAlunoIds] = useState<string[]>([]);
-  const [especialidade, setEspecialidade] = useState<string>("");
-  const [especialidadeCustom, setEspecialidadeCustom] = useState<string>("");
-  
-  const [dataInicio, setDataInicio] = useState("");
-  const [dataFim, setDataFim] = useState("");
-  const [horaInicio, setHoraInicio] = useState("08:00");
-  const [horaFim, setHoraFim] = useState("12:00");
-  
-  const [mes, setMes] = useState("");
-  const [semestre, setSemestre] = useState("");
-  const [rotacao, setRotacao] = useState("");
-  const [chPrevista, setChPrevista] = useState<number | "">("");
-  const [horasRealizadas, setHorasRealizadas] = useState<number | "">("");
-  
-  const [rotacoesOptions, setRotacoesOptions] = useState<{id: string, nome: string}[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    supabase.from("rotacoes" as any).select("id, nome").order("nome").then(({data}) => {
-      if (data) setRotacoesOptions(data);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    supabase.from("preceptores").select("id, nome, especialidade").order("nome").then(({data}) => {
-      if (data) setPreceptoresOptions(data as PreceptorSimple[]);
-    });
-    
-    // Reset state
-    setAlunoIds([]);
-    setEspecialidade("");
-    setEspecialidadeCustom("");
-    setDataInicio("");
-    setDataFim("");
-    setHoraInicio("08:00");
-    setHoraFim("12:00");
-    setMes("");
-    setSemestre("");
-    setRotacao("");
-    setChPrevista("");
-    setHorasRealizadas("");
-    setSearch("");
-
-    if (preceptor) {
-      setSelectedPreceptor({ id: preceptor.id, nome: preceptor.nome, especialidade: preceptor.especialidade });
-      setMes(preceptor.mes_referencia || "");
-      setSemestre(preceptor.semestre || "");
-      setRotacao(preceptor.rotacao_periodo_id || "");
-      setChPrevista(preceptor.ch_prevista || "");
-      setHorasRealizadas(preceptor.horas_realizadas || "");
-      
-      if (preceptor.hora_inicio) setHoraInicio(preceptor.hora_inicio);
-      if (preceptor.hora_fim) setHoraFim(preceptor.hora_fim);
-
-      if (preceptor.especialidade) {
-        if (ESPECIALIDADES_COMUNS.includes(preceptor.especialidade as any)) {
-          setEspecialidade(preceptor.especialidade);
-        } else {
-          setEspecialidade("Outra");
-          setEspecialidadeCustom(preceptor.especialidade);
-        }
-      }
-      
-      // We need to fetch the specific alocacoes for this preceptor in this unit
-      // Since preceptor doesn't store dataInicio/dataFim directly on the object, we fetch it
-      supabase
-        .from("alocacoes" as any)
-        .select("aluno_id, data_inicio, data_fim")
-        .eq("preceptor_id", preceptor.id)
-        .eq("unidade_id", unidadeId)
-        .then(({ data }) => {
-          if (data && data.length > 0) {
-            setDataInicio(data[0].data_inicio || "");
-            setDataFim(data[0].data_fim || "");
-            const ids = data.map((a: any) => a.aluno_id).filter(Boolean);
-            setAlunoIds(ids);
-          }
-        });
-    } else {
-      setSelectedPreceptor(null);
-    }
-  }, [open, preceptor, unidadeId]);
-
-  // Cálculo automático de Horas Realizadas
-  useEffect(() => {
-    if (!dataInicio || !dataFim || !horaInicio || !horaFim) return;
-    try {
-      const start = new Date(dataInicio);
-      const end = new Date(dataFim);
-      if (end < start) return;
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      const [h1, m1] = horaInicio.split(":").map(Number);
-      const [h2, m2] = horaFim.split(":").map(Number);
-      let diffHours = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
-      if (diffHours < 0) diffHours += 24;
-      const chCalculada = Math.round(diffDays * diffHours);
-      if (chCalculada > 0) {
-        setHorasRealizadas(chCalculada);
-      }
-    } catch (e) {}
-  }, [dataInicio, dataFim, horaInicio, horaFim]);
-
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter" || !search.trim()) return;
-    e.preventDefault();
-    const searchLower = search.trim().toLowerCase();
-    const match = preceptoresOptions.find(p => p.nome.toLowerCase() === searchLower);
-    if (match) {
-      setSelectedPreceptor(match);
-      if (match.especialidade) {
-        if (ESPECIALIDADES_COMUNS.includes(match.especialidade as any)) setEspecialidade(match.especialidade);
-        else { setEspecialidade("Outra"); setEspecialidadeCustom(match.especialidade); }
-      }
-    } else {
-      setSelectedPreceptor({ id: "NEW_TEMP_ID_" + crypto.randomUUID(), nome: search.trim(), especialidade: null });
-      setEspecialidade("");
-      setEspecialidadeCustom("");
-    }
-    setSearch("");
-  };
-
-  async function handleSave() {
-    if (!selectedPreceptor) {
-      toast.warning("Selecione ou crie um preceptor primeiro.");
-      return;
-    }
-    setSaving(true);
-    try {
-      let realPreceptorId = selectedPreceptor.id;
-
-      // Se é um preceptor novo (criado na hora)
-      if (realPreceptorId.startsWith("NEW_TEMP_ID_")) {
-        const finalEsp = especialidade === "Outra" ? especialidadeCustom.trim() : especialidade;
-        const insertData: any = { nome: selectedPreceptor.nome };
-        if (finalEsp) insertData.especialidade = finalEsp;
-        
-        const { data, error } = await supabase.from("preceptores").insert(insertData).select("id").single();
-        if (error) throw error;
-        realPreceptorId = data.id;
-      } else {
-        // Atualizar especialidade do preceptor existente se mudou
-        const finalEsp = especialidade === "Outra" ? especialidadeCustom.trim() : especialidade;
-        if (finalEsp) {
-          await supabase.from("preceptores").update({ especialidade: finalEsp }).eq("id", realPreceptorId);
-        }
-      }
-
-      // Validação anti-conflito para os alunos
-      if (alunoIds.length > 0) {
-        const { data: extAloc, error: fetchErr } = await supabase
-          .from("alocacoes" as any)
-          .select("aluno_id, unidade_id, data_inicio, data_fim, hora_inicio, hora_fim")
-          .in("aluno_id", alunoIds);
-        
-        if (!fetchErr && extAloc) {
-          const newStart = new Date(dataInicio || new Date().toISOString().split("T")[0]);
-          const newEnd = dataFim ? new Date(dataFim) : new Date("2099-12-31");
-          for (const ext of extAloc) {
-            const extStart = new Date(ext.data_inicio);
-            const extEnd = ext.data_fim ? new Date(ext.data_fim) : new Date("2099-12-31");
-            const datesOverlap = newStart <= extEnd && newEnd >= extStart;
-            const timesOverlap = (horaInicio || "00:00") < (ext.hora_fim || "23:59") && (horaFim || "23:59") > (ext.hora_inicio || "00:00");
-            if (datesOverlap && timesOverlap && ext.unidade_id !== unidadeId) {
-              toast.error("Conflito: Um ou mais alunos selecionados já possuem alocação em outra unidade neste mesmo dia e horário!");
-              setSaving(false);
-              return;
-            }
-          }
-        }
-      }
-
-      // Validação anti-conflito para o preceptor
-      const { data: pAloc, error: pFetchErr } = await supabase
-        .from("alocacoes" as any)
-        .select("unidade_id, data_inicio, data_fim, hora_inicio, hora_fim")
-        .eq("preceptor_id", realPreceptorId);
-      
-      if (!pFetchErr && pAloc) {
-        const newStart = new Date(dataInicio || new Date().toISOString().split("T")[0]);
-        const newEnd = dataFim ? new Date(dataFim) : new Date("2099-12-31");
-        for (const ext of pAloc) {
-          const extStart = new Date(ext.data_inicio);
-          const extEnd = ext.data_fim ? new Date(ext.data_fim) : new Date("2099-12-31");
-          const datesOverlap = newStart <= extEnd && newEnd >= extStart;
-          const timesOverlap = (horaInicio || "00:00") < (ext.hora_fim || "23:59") && (horaFim || "23:59") > (ext.hora_inicio || "00:00");
-          if (datesOverlap && timesOverlap && ext.unidade_id !== unidadeId) {
-            toast.error("Conflito: Este preceptor já está escalado para outra unidade neste mesmo dia e horário!");
-            setSaving(false);
-            return;
-          }
-        }
-      }
-
-      // Limpar vínculos operacionais antigos DENTRO DESTA UNIDADE PARA ESTE PRECEPTOR APENAS
-      await supabase.from("alocacoes" as any).delete().eq("unidade_id", unidadeId).eq("preceptor_id", realPreceptorId);
-      
-      // Desvincular preceptor atual dos alunos
-      if (preceptor) {
-        await supabase.from("alunos" as any).update({ preceptor_id: null }).eq("preceptor_id", realPreceptorId);
-      }
-
-      // Criar novos vínculos
-      const alocacoesToInsert: any[] = [];
-      const baseData = {
-        preceptor_id: realPreceptorId,
-        unidade_id: unidadeId,
-        data_inicio: dataInicio || new Date().toISOString().split("T")[0],
-        data_fim: dataFim || null,
-        hora_inicio: horaInicio || null,
-        hora_fim: horaFim || null,
-        mes_referencia: mes || null,
-        semestre: semestre || null,
-        rotacao_periodo_id: rotacao || null,
-        ch_prevista: chPrevista || null,
-        horas_realizadas: horasRealizadas || null,
-      };
-
-      if (alunoIds.length > 0) {
-        alunoIds.forEach(aId => alocacoesToInsert.push({ ...baseData, aluno_id: aId }));
-      } else {
-        alocacoesToInsert.push({ ...baseData, aluno_id: null });
-      }
-
-      const { error: insertErr } = await supabase.from("alocacoes" as any).insert(alocacoesToInsert);
-      if (insertErr) throw insertErr;
-
-      // Atualizar alunos.preceptor_id
-      if (alunoIds.length > 0) {
-        await supabase.from("alunos").update({ preceptor_id: realPreceptorId }).in("id", alunoIds);
-      }
-
-      toast.success("Alocação salva com sucesso!");
-      onSaved();
-    } catch(e: any) {
-      toast.error("Erro: " + (e?.message || "Tente novamente"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const visiblePreceptores = preceptoresOptions.filter(p => p.nome.toLowerCase().includes(search.toLowerCase()));
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Settings2 className="h-5 w-5 text-primary" />
-            {isNew ? "Vincular Preceptor" : `Gerenciar Alocação: ${preceptor?.nome}`}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="grid gap-5 py-2 max-h-[65vh] overflow-y-auto pr-1">
-          {/* Se for Novo, permite pesquisar e selecionar um preceptor */}
-          {!selectedPreceptor && (
-            <div>
-              <Label>Buscar ou Criar Preceptor</Label>
-              <div className="relative mt-1 mb-2">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar preceptor… (Enter para criar novo)"
-                  className="pl-8"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                />
-              </div>
-              <div className="rounded-md border divide-y overflow-y-auto max-h-44 bg-background">
-                {visiblePreceptores.length === 0 ? (
-                  <div className="py-4 text-center text-sm text-muted-foreground">
-                    Pressione Enter para criar '{search}'
-                  </div>
-                ) : (
-                  visiblePreceptores.slice(0, 30).map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => {
-                        setSelectedPreceptor(p);
-                        if (p.especialidade) {
-                          if (ESPECIALIDADES_COMUNS.includes(p.especialidade as any)) setEspecialidade(p.especialidade);
-                          else { setEspecialidade("Outra"); setEspecialidadeCustom(p.especialidade); }
-                        }
-                      }}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium leading-tight">{p.nome}</p>
-                        {p.especialidade && <p className="text-xs text-muted-foreground">{p.especialidade}</p>}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Formato de Edição quando selecionado */}
-          {selectedPreceptor && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-md bg-muted/20 border">
-                <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Preceptor</span>
-                  <span className="font-semibold">{selectedPreceptor.nome}</span>
-                  {selectedPreceptor.id.startsWith("NEW_TEMP_ID_") && <Badge className="w-fit mt-1 text-[10px]">Novo Preceptor</Badge>}
-                </div>
-                {isNew && (
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedPreceptor(null)}>Trocar</Button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-[1fr_auto] sm:grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label>Especialidade</Label>
-                  <Select value={especialidade} onValueChange={setEspecialidade}>
-                    <SelectTrigger className="h-8"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>
-                      {ESPECIALIDADES_COMUNS.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {especialidade === "Outra" && (
-                  <div className="grid gap-1.5">
-                    <Label>Especificar</Label>
-                    <Input className="h-8" value={especialidadeCustom} onChange={e => setEspecialidadeCustom(e.target.value)} />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid gap-1.5 border-t pt-3">
-                <Label>Quantidade e Vínculo de Alunos</Label>
-                <AlunoMultiSelect
-                  allAlunos={allAlunos}
-                  selectedAlunoIds={alunoIds}
-                  onChangeAlunoIds={setAlunoIds}
-                  preceptorNome={selectedPreceptor.nome}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 border-t pt-3">
-                <div className="grid gap-1.5">
-                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Mês Referência</Label>
-                  <Select value={mes} onValueChange={setMes}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Mês" /></SelectTrigger>
-                    <SelectContent>
-                      {["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"].map(m => (
-                        <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Semestre</Label>
-                  <Select value={semestre} onValueChange={setSemestre}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sem." /></SelectTrigger>
-                    <SelectContent>
-                      {["9º", "10º", "11º", "12º"].map(m => <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Rotação</Label>
-                  <Select value={rotacao} onValueChange={setRotacao}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Rotação" /></SelectTrigger>
-                    <SelectContent>
-                      {rotacoesOptions.map(r => <SelectItem key={r.id} value={r.id} className="text-xs">{r.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">CH Prevista</Label>
-                  <Input type="number" min={0} className="h-8 text-xs" value={chPrevista} onChange={(e) => setChPrevista(e.target.value ? Number(e.target.value) : "")} />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">H. Realizadas</Label>
-                  <Input type="number" min={0} className="h-8 text-xs bg-muted/50 cursor-not-allowed" readOnly value={horasRealizadas} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 border-t pt-3">
-                <div className="grid gap-2"><Label>Data Início</Label><Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} /></div>
-                <div className="grid gap-2"><Label>Data Fim</Label><Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} /></div>
-                <div className="grid gap-2"><Label>Hora Início</Label><Input type="time" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} /></div>
-                <div className="grid gap-2"><Label>Hora Fim</Label><Input type="time" value={horaFim} onChange={e => setHoraFim(e.target.value)} /></div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving || !selectedPreceptor}>
-            {saving ? "Salvando…" : isNew ? "Adicionar Preceptor" : "Salvar Alterações"}
           </Button>
         </DialogFooter>
       </DialogContent>
