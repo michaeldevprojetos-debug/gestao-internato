@@ -180,7 +180,9 @@ function HospitaisPage() {
         .eq("preceptor_id", preceptorId);
       if (error) throw error;
       toast.success("Vínculo do preceptor removido do bloco.");
-      queryClient.invalidateQueries({ queryKey: ["hospitaisData"] });
+      fetchLocais();
+      await queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
+      await queryClient.invalidateQueries({ queryKey: ["alocacoes"] });
     } catch (e: any) {
       toast.error("Erro ao limpar vínculo: " + e.message);
     }
