@@ -12,4 +12,10 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Force Nitro to build with the Vercel preset when deploying outside Lovable sandbox.
+  // Without this, @lovable.dev/vite-tanstack-config skips Nitro entirely in non-sandbox
+  // environments, producing a static-only dist that cannot handle SSR routes.
+  nitro: {
+    preset: "vercel",
+  },
 });
