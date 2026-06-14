@@ -83,6 +83,7 @@ type LocalSimple = {
   id: string;
   nome: string;
   tipo: string;
+  valor_mensal_contrato?: number; // NOVA COLUNA FINANCEIRA
 };
 
 type VinculoQtd = {
@@ -102,6 +103,7 @@ type LocalRow = {
   id: string;
   nome: string;
   tipo: string;
+  valor_mensal_contrato?: number; // NOVA COLUNA FINANCEIRA
   totalPreceptores: number;
   especialidades: string[];
   preceptoresList: Array<{
@@ -214,7 +216,7 @@ function HospitaisPage() {
       // 1. Todos os locais cadastrados
       const { data: locaisData, error: err1 } = (await supabase
         .from("unidades" as any)
-        .select("id, nome, tipo")
+        .select("id, nome, tipo, valor_mensal_contrato") // NOVA COLUNA FINANCEIRA
         .order("nome")) as { data: any[] | null; error: any };
       if (err1) throw err1;
 
@@ -329,6 +331,7 @@ function HospitaisPage() {
           id: local.id,
           nome: local.nome,
           tipo: local.tipo,
+          valor_mensal_contrato: local.valor_mensal_contrato, // NOVA COLUNA FINANCEIRA
           totalPreceptores: activePreceptors.length,
           especialidades: Array.from(specs).sort(),
           preceptoresList: unitPreceptors.map((p) => {
@@ -528,6 +531,7 @@ function HospitaisPage() {
                 <TableRow>
                   <TableHead>Unidade / Campo de Prática</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Valor do Contrato</TableHead> {/* NOVA COLUNA FINANCEIRA */}
                   <TableHead>Especialidades</TableHead>
                   <TableHead className="text-right">Preceptores</TableHead>
                   <TableHead className="text-right">Alunos Vinculados</TableHead>
@@ -594,6 +598,17 @@ function HospitaisPage() {
                             >
                               {u.tipo}
                             </span>
+                          </TableCell>
+
+                          {/* NOVA COLUNA FINANCEIRA */}
+                          <TableCell>
+                            {u.valor_mensal_contrato != null ? (
+                              <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(u.valor_mensal_contrato)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
 
                           <TableCell>
@@ -1253,6 +1268,7 @@ function GerenciarUnidadeDialog({
   const isNew = !local;
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<string>("Outro");
+  const [valorContrato, setValorContrato] = useState<number | "">(""); // NOVA COLUNA FINANCEIRA
   const [saving, setSaving] = useState(false);
 
 
@@ -1260,6 +1276,7 @@ function GerenciarUnidadeDialog({
     if (!open) return;
     setNome(local?.nome ?? "");
     setTipo(local?.tipo ?? "Outro");
+    setValorContrato(local?.valor_mensal_contrato ?? ""); // NOVA COLUNA FINANCEIRA
   }, [open, local]);
 
   const locaisOptions = allLocaisSimple.map((l) => ({
@@ -1272,6 +1289,7 @@ function GerenciarUnidadeDialog({
     const matchedLocal = allLocaisSimple.find((l) => l.nome === val);
     if (matchedLocal) {
       setTipo(matchedLocal.tipo);
+      setValorContrato(matchedLocal.valor_mensal_contrato ?? ""); // NOVA COLUNA FINANCEIRA
     }
   };
 
@@ -1290,12 +1308,12 @@ function GerenciarUnidadeDialog({
       if (isNew) {
         if (matchedLocal) {
           localId = matchedLocal.id;
-          const { error } = await supabase.from("unidades" as any).update({ tipo }).eq("id", localId);
+          const { error } = await supabase.from("unidades" as any).update({ tipo, valor_mensal_contrato: valorContrato === "" ? null : Number(valorContrato) }).eq("id", localId); // NOVA COLUNA FINANCEIRA
           if (error) throw error;
         } else {
           const { data, error } = (await supabase
             .from("unidades" as any)
-            .insert({ nome: nome.trim(), tipo })
+            .insert({ nome: nome.trim(), tipo, valor_mensal_contrato: valorContrato === "" ? null : Number(valorContrato) }) // NOVA COLUNA FINANCEIRA
             .select("id")
             .single()) as { data: any; error: any };
           if (error) throw error;
@@ -1304,7 +1322,7 @@ function GerenciarUnidadeDialog({
       } else {
         const { error } = await supabase
           .from("unidades" as any)
-          .update({ nome: nome.trim(), tipo })
+          .update({ nome: nome.trim(), tipo, valor_mensal_contrato: valorContrato === "" ? null : Number(valorContrato) }) // NOVA COLUNA FINANCEIRA
           .eq("id", local!.id);
         if (error) throw error;
       }
@@ -1352,6 +1370,19 @@ function GerenciarUnidadeDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          {/* NOVA COLUNA FINANCEIRA */}
+          <div className="grid gap-2">
+            <Label htmlFor="g-valor">Valor Mensal do Contrato (R$)</Label>
+            <Input
+              id="g-valor"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Ex.: 11550.30"
+              value={valorContrato}
+              onChange={(e) => setValorContrato(e.target.value === "" ? "" : Number(e.target.value))}
+            />
           </div>
         </div>
         <DialogFooter className="gap-2">
