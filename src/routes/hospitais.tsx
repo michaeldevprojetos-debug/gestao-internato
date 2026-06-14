@@ -97,6 +97,8 @@ type VinculoQtd = {
   rotacao_periodo_id?: string | null;
   ch_prevista?: number | null;
   horas_realizadas?: number | null;
+  carga_horaria_semanal?: number | null; // NOVA REGRA: CALCULO SEMANAL X 4.5
+  valor_hora_aula?: number | null; // NOVA REGRA
 };
 
 type LocalRow = {
@@ -120,6 +122,8 @@ type LocalRow = {
     rotacao_periodo_id: string | null;
     ch_prevista: number | null;
     horas_realizadas: number | null;
+    carga_horaria_semanal: number | null; // NOVA REGRA
+    valor_hora_aula: number | null; // NOVA REGRA
     valor_hora: number | null;
   }>;
   alunosVinculados: {
@@ -247,7 +251,7 @@ function HospitaisPage() {
       // 4. Vínculos operacionais
       const { data: vinculosData, error: err3 } = (await supabase
         .from("alocacoes" as any)
-        .select("id, preceptor_id, aluno_id, unidade_id, hora_inicio, hora_fim, mes_referencia, semestre, rotacao_periodo_id, ch_prevista, horas_realizadas, alunos ( nome, semestre )")) as { data: any[] | null; error: any };
+        .select("id, preceptor_id, aluno_id, unidade_id, hora_inicio, hora_fim, mes_referencia, semestre, rotacao_periodo_id, ch_prevista, horas_realizadas, carga_horaria_semanal, valor_hora_aula, alunos ( nome, semestre )")) as { data: any[] | null; error: any };
       if (err3) throw err3;
 
       type AlunoInfo = { id: string; nome: string; semestre: number | null };
@@ -279,6 +283,8 @@ function HospitaisPage() {
             rotacao_periodo_id: v.rotacao_periodo_id ?? null,
             ch_prevista: v.ch_prevista ?? null,
             horas_realizadas: v.horas_realizadas ?? null,
+            carga_horaria_semanal: v.carga_horaria_semanal ?? null, // NOVA REGRA
+            valor_hora_aula: v.valor_hora_aula ?? null, // NOVA REGRA
           });
         }
         if (!v.aluno_id) continue;
@@ -350,6 +356,8 @@ function HospitaisPage() {
               rotacao_periodo_id: pqtd?.rotacao_periodo_id ?? null,
               ch_prevista: pqtd?.ch_prevista ?? null,
               horas_realizadas: pqtd?.horas_realizadas ?? null,
+              carga_horaria_semanal: pqtd?.carga_horaria_semanal ?? null, // NOVA REGRA
+              valor_hora_aula: pqtd?.valor_hora_aula ?? null, // NOVA REGRA
               valor_hora: p.valor_hora ?? 0,
             };
           }),
@@ -1438,6 +1446,8 @@ function GerenciarAlocacaoPreceptorDialog({
   const [rotacao, setRotacao] = useState("");
   const [chPrevista, setChPrevista] = useState<number | "">("");
   const [horasRealizadas, setHorasRealizadas] = useState<number | "">("");
+  const [cargaHorariaSemanal, setCargaHorariaSemanal] = useState<number | "">(""); // NOVA REGRA
+  const [valorHoraAula, setValorHoraAula] = useState<number | "">(50.00); // NOVA REGRA
   
   const [rotacoesOptions, setRotacoesOptions] = useState<{id: string, nome: string}[]>([]);
   const [saving, setSaving] = useState(false);
@@ -1467,6 +1477,8 @@ function GerenciarAlocacaoPreceptorDialog({
     setRotacao("");
     setChPrevista("");
     setHorasRealizadas("");
+    setCargaHorariaSemanal(""); // NOVA REGRA
+    setValorHoraAula(50.00); // NOVA REGRA
     setSearch("");
 
     if (preceptor) {
@@ -1476,6 +1488,8 @@ function GerenciarAlocacaoPreceptorDialog({
       setRotacao(preceptor.rotacao_periodo_id || "");
       setChPrevista(preceptor.ch_prevista || "");
       setHorasRealizadas(preceptor.horas_realizadas || "");
+      setCargaHorariaSemanal(preceptor.carga_horaria_semanal || ""); // NOVA REGRA
+      setValorHoraAula(preceptor.valor_hora_aula || 50.00); // NOVA REGRA
       
       if (preceptor.hora_inicio) setHoraInicio(preceptor.hora_inicio);
       if (preceptor.hora_fim) setHoraFim(preceptor.hora_fim);
@@ -1510,25 +1524,12 @@ function GerenciarAlocacaoPreceptorDialog({
     }
   }, [open, preceptor, unidadeId]);
 
-  // Cálculo automático de Horas Realizadas
+  // NOVA REGRA: CALCULO SEMANAL X 4.5
   useEffect(() => {
-    if (!dataInicio || !dataFim || !horaInicio || !horaFim) return;
-    try {
-      const start = new Date(dataInicio);
-      const end = new Date(dataFim);
-      if (end < start) return;
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      const [h1, m1] = horaInicio.split(":").map(Number);
-      const [h2, m2] = horaFim.split(":").map(Number);
-      let diffHours = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60;
-      if (diffHours < 0) diffHours += 24;
-      const chCalculada = Math.round(diffDays * diffHours);
-      if (chCalculada > 0) {
-        setHorasRealizadas(chCalculada);
-      }
-    } catch (e) {}
-  }, [dataInicio, dataFim, horaInicio, horaFim]);
+    if (cargaHorariaSemanal && typeof cargaHorariaSemanal === "number") {
+      setHorasRealizadas(Math.round((cargaHorariaSemanal * 4.5) * 100) / 100);
+    }
+  }, [cargaHorariaSemanal]);
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter" || !search.trim()) return;
@@ -1643,6 +1644,8 @@ function GerenciarAlocacaoPreceptorDialog({
         rotacao_periodo_id: rotacao || null,
         ch_prevista: chPrevista || null,
         horas_realizadas: horasRealizadas || null,
+        carga_horaria_semanal: cargaHorariaSemanal || null, // NOVA REGRA
+        valor_hora_aula: valorHoraAula || null, // NOVA REGRA
       };
 
       if (alunoIds.length > 0) {
@@ -1771,7 +1774,7 @@ function GerenciarAlocacaoPreceptorDialog({
                 />
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 border-t pt-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 border-t pt-3">
                 <div className="grid gap-1.5">
                   <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Mês Referência</Label>
                   <Select value={mes} onValueChange={setMes}>
@@ -1805,9 +1808,18 @@ function GerenciarAlocacaoPreceptorDialog({
                   <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">CH Prevista</Label>
                   <Input type="number" min={0} className="h-8 text-xs" value={chPrevista} onChange={(e) => setChPrevista(e.target.value ? Number(e.target.value) : "")} />
                 </div>
+                {/* NOVA REGRA */}
+                <div className="grid gap-1.5">
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">CH Semanal</Label>
+                  <Input type="number" min={0} className="h-8 text-xs" value={cargaHorariaSemanal} onChange={(e) => setCargaHorariaSemanal(e.target.value ? Number(e.target.value) : "")} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Valor Hora (R$)</Label>
+                  <Input type="number" step="0.01" min={0} className="h-8 text-xs" value={valorHoraAula} onChange={(e) => setValorHoraAula(e.target.value ? Number(e.target.value) : "")} />
+                </div>
                 <div className="grid gap-1.5">
                   <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">H. Realizadas</Label>
-                  <Input type="number" min={0} className="h-8 text-xs bg-muted/50 cursor-not-allowed" readOnly value={horasRealizadas} />
+                  <Input type="number" min={0} className="h-8 text-xs" value={horasRealizadas} onChange={(e) => setHorasRealizadas(e.target.value ? Number(e.target.value) : "")} />
                 </div>
               </div>
 
