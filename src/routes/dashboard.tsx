@@ -242,10 +242,12 @@ function Dashboard() {
     totalAlunos,
     totalPreceptores,
     totalUnidades,
+    custoTotal,
     rankingData,
     especialidadeData,
     alertasPreceptor,
     alertasUnidade,
+    activeUnidadesIds,
   } = useMemo(() => {
     const alunosSet = new Set<string>();
     const preceptoresSet = new Set<string>();
