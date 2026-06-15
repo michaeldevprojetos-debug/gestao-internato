@@ -46,6 +46,7 @@ import {
   AlertTriangle,
   RefreshCw,
   CheckCircle2,
+  DollarSign,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSystemConfig } from "@/hooks/use-system-config";
@@ -148,11 +149,18 @@ function Dashboard() {
   const { data: dashboardData, isLoading: loading } = useQuery({
     queryKey: ["dashboardData"],
     queryFn: async () => {
-      const { data: viewData, error } = (await supabase
-        .from("vw_dashboard_preceptores" as any)
-        .select("*")) as { data: any[] | null; error: any };
-      if (error) throw error;
-      return { alocacoes: viewData || [] };
+      const [viewRes, unidadesRes] = await Promise.all([
+        supabase.from("vw_dashboard_preceptores").select("*"),
+        supabase.from("unidades").select("id, nome, valor_mensal_contrato, status")
+      ]);
+      
+      if (viewRes.error) throw viewRes.error;
+      if (unidadesRes.error) throw unidadesRes.error;
+      
+      return { 
+        alocacoes: viewRes.data || [],
+        unidadesDB: unidadesRes.data || []
+      };
     },
   });
 
@@ -175,6 +183,7 @@ function Dashboard() {
   }, [queryClient]);
 
   const alocacoes = dashboardData?.alocacoes || [];
+  const unidadesDB = dashboardData?.unidadesDB || [];
   const lastUpdate = new Date();
 
   // --- Filtros dinâmicos ---
@@ -313,16 +322,24 @@ function Dashboard() {
       .filter((u) => u.count.size > limiteUnidade)
       .map((u) => ({ nome: u.nome, alunos: u.count.size }));
 
+    const activeUnidadesIds = Array.from(unidadesSet);
+    const custoTotal = activeUnidadesIds.reduce((acc, uid) => {
+      const uni = unidadesDB.find(u => u.id === uid);
+      return acc + (Number(uni?.valor_mensal_contrato) || 0);
+    }, 0);
+
     return {
       totalAlunos: alunosSet.size,
       totalPreceptores: preceptoresSet.size,
-      totalUnidades: unidadesSet.size,
+      totalUnidades: activeUnidadesIds.length,
+      custoTotal,
       rankingData: rData,
       especialidadeData: eData,
       alertasPreceptor: aPrec,
       alertasUnidade: aUni,
+      activeUnidadesIds,
     };
-  }, [filteredAloc, limitePreceptor, limiteUnidade]);
+  }, [filteredAloc, limitePreceptor, limiteUnidade, unidadesDB]);
 
   // --- Tabela de Distribuição Acadêmica ---
   const distribuicaoData = useMemo(() => {
@@ -615,7 +632,14 @@ function Dashboard() {
       </div>
 
       {/* ── KPIs ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        {/* COMPONENTE: FINANCEIRO DASHBOARD */}
+        <Stat 
+          icon={DollarSign} 
+          value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(custoTotal)} 
+          label="Investimento Mensal" 
+          hint="contratos de unidades" 
+        />
         <Stat icon={Users} value={totalAlunos} label="Alunos" hint="vinculados ativos" />
         <Stat icon={Stethoscope} value={totalPreceptores} label="Preceptores" hint="com vínculos" />
         <Stat icon={Activity} value={mediaAlunosPreceptor} label="Média" hint="Alunos/Preceptor" isRatio />
@@ -848,6 +872,64 @@ function Dashboard() {
                   <TableRow>
                     <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
                       Nenhum dado encontrado para os filtros selecionados.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* COMPONENTE: FINANCEIRO DASHBOARD - TABELA DE CONTRATOS */}
+      <Card className="shadow-md dark:shadow-none border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/40 overflow-hidden mt-6">
+        <CardHeader className="border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-emerald-500" />
+              Contratos por Unidade
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Valor de investimento mensal por unidade ativa com alunos alocados
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="max-h-[300px] overflow-y-auto">
+            <Table>
+              <TableHeader className="bg-slate-50 dark:bg-slate-900/80 sticky top-0 z-10">
+                <TableRow>
+                  <TableHead className="font-bold text-slate-700 dark:text-slate-300">Unidade</TableHead>
+                  <TableHead className="font-bold text-slate-700 dark:text-slate-300 text-right">Valor do Contrato</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" /></TableCell>
+                      <TableCell><div className="h-4 w-24 bg-slate-200 dark:bg-slate-800 rounded animate-pulse ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : activeUnidadesIds.length > 0 ? (
+                  activeUnidadesIds
+                    .map(uid => unidadesDB.find(u => u.id === uid))
+                    .filter(Boolean)
+                    .sort((a, b) => a!.nome.localeCompare(b!.nome))
+                    .map((unidade, idx) => (
+                      <TableRow key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <TableCell className="font-medium text-slate-700 dark:text-slate-300">
+                          {unidade!.nome}
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-emerald-600 dark:text-emerald-400">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(unidade!.valor_mensal_contrato) || 0)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={2} className="h-24 text-center text-muted-foreground">
+                      Nenhuma unidade ativa encontrada para os filtros selecionados.
                     </TableCell>
                   </TableRow>
                 )}
