@@ -907,13 +907,13 @@ function PreceptorCard({
           <div className="flex justify-between items-center">
             <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Custo Total Rotação</span>
             <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((p.horas_realizadas || 0) * (p.valor_hora || 0))}
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((p.horas_realizadas || 0) * (p.valor_hora_aula || p.valor_hora || 0))}
             </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Custo Prop. por Aluno</span>
             <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-              {p.quantidadeAlunos > 0 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(((p.horas_realizadas || 0) * (p.valor_hora || 0)) / p.quantidadeAlunos) : 'R$ 0,00'}
+              {p.quantidadeAlunos > 0 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(((p.horas_realizadas || 0) * (p.valor_hora_aula || p.valor_hora || 0)) / p.quantidadeAlunos) : 'R$ 0,00'}
             </span>
           </div>
         </div>

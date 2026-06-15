@@ -151,11 +151,17 @@ function Dashboard() {
     queryFn: async () => {
       const [viewRes, unidadesRes] = await Promise.all([
         supabase.from("vw_dashboard_preceptores").select("*"),
-        supabase.from("unidades").select("id, nome, valor_mensal_contrato, status")
+        supabase.from("unidades").select("id, nome, valor_mensal_contrato")
       ]);
       
-      if (viewRes.error) throw viewRes.error;
-      if (unidadesRes.error) throw unidadesRes.error;
+      if (viewRes.error) {
+        console.error("Erro vw_dashboard_preceptores:", viewRes.error);
+        throw viewRes.error;
+      }
+      if (unidadesRes.error) {
+        console.error("Erro unidades:", unidadesRes.error);
+        throw unidadesRes.error;
+      }
       
       return { 
         alocacoes: viewRes.data || [],
@@ -248,6 +254,7 @@ function Dashboard() {
     alertasPreceptor,
     alertasUnidade,
     activeUnidadesIds,
+    todasUnidadesAtivas,
   } = useMemo(() => {
     const alunosSet = new Set<string>();
     const preceptoresSet = new Set<string>();
@@ -324,22 +331,22 @@ function Dashboard() {
       .filter((u) => u.count.size > limiteUnidade)
       .map((u) => ({ nome: u.nome, alunos: u.count.size }));
 
-    const activeUnidadesIds = Array.from(unidadesSet);
-    const custoTotal = activeUnidadesIds.reduce((acc, uid) => {
-      const uni = unidadesDB.find(u => u.id === uid);
+    const todasUnidadesAtivas = unidadesDB;
+    const custoTotal = todasUnidadesAtivas.reduce((acc, uni) => {
       return acc + (Number(uni?.valor_mensal_contrato) || 0);
     }, 0);
 
     return {
       totalAlunos: alunosSet.size,
       totalPreceptores: preceptoresSet.size,
-      totalUnidades: activeUnidadesIds.length,
+      totalUnidades: unidadesSet.size,
       custoTotal,
       rankingData: rData,
       especialidadeData: eData,
       alertasPreceptor: aPrec,
       alertasUnidade: aUni,
-      activeUnidadesIds,
+      activeUnidadesIds: Array.from(unidadesSet),
+      todasUnidadesAtivas,
     };
   }, [filteredAloc, limitePreceptor, limiteUnidade, unidadesDB]);
 
@@ -913,18 +920,16 @@ function Dashboard() {
                       <TableCell><div className="h-4 w-24 bg-slate-200 dark:bg-slate-800 rounded animate-pulse ml-auto" /></TableCell>
                     </TableRow>
                   ))
-                ) : activeUnidadesIds.length > 0 ? (
-                  activeUnidadesIds
-                    .map(uid => unidadesDB.find(u => u.id === uid))
-                    .filter(Boolean)
-                    .sort((a, b) => a!.nome.localeCompare(b!.nome))
+                ) : todasUnidadesAtivas.length > 0 ? (
+                  todasUnidadesAtivas
+                    .sort((a, b) => a.nome.localeCompare(b.nome))
                     .map((unidade, idx) => (
                       <TableRow key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                         <TableCell className="font-medium text-slate-700 dark:text-slate-300">
-                          {unidade!.nome}
+                          {unidade.nome}
                         </TableCell>
                         <TableCell className="text-right font-medium text-emerald-600 dark:text-emerald-400">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(unidade!.valor_mensal_contrato) || 0)}
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(unidade.valor_mensal_contrato) || 0)}
                         </TableCell>
                       </TableRow>
                     ))
